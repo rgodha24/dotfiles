@@ -54,7 +54,7 @@ local plugins = {
     config = function()
       require("copilot").setup {
         suggestion = { auto_trigger = true, debounce = 150, keymap = { accept = "<C-l>" } },
-        copilot_node_command = "/usr/local/bin/node",
+        copilot_node_command = "/Users/rohangodha/.nix-profile/bin/node",
       }
     end,
   },

@@ -16,24 +16,27 @@
           # general tools
           ripgrep
           eza
-          neovim
           lazygit
           gh
           bat
           zoxide
-          fnm
           jq
+
           rustup
+
+          neovim
+
           corepack
           bun
+          fnm
+          # only really used for gh copilot in neovim cuz it doesn't play nicely with fnm
+          nodejs_20
 
-          # lsps and formatters
+          # formatters
           prettierd
           stylua
           rustywind
-          alejandra
-
-          # ... add your tools here
+          alejandra # for nix
         ];
       };
   };
