@@ -18,6 +18,13 @@
 	neovim
 	lazygit
 	gh
+	bat
+	zoxide
+	fnm
+	jq
+	rustup
+	corepack
+	bun
 
         # ... add your tools here
       ];
