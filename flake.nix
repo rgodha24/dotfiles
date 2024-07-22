@@ -32,11 +32,21 @@
           # only really used for gh copilot in neovim cuz it doesn't play nicely with fnm
           nodejs_20
 
-          # formatters
+          # formatters + lsps
           prettierd
           stylua
           rustywind
           alejandra # for nix
+          tailwindcss-language-server
+
+          # java
+          zulu
+
+          # random dev deps
+          gnum4
+
+          # apps
+          localsend
         ];
       };
   };

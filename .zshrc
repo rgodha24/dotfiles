@@ -1,7 +1,10 @@
 eval "$(fnm env --use-on-cd)"
 eval "$(zoxide init zsh)"
 
+export PATH="$PATH:/Users/rohangodha/.cargo/bin/"
+
 alias cd="z"
+alias ls="eza"
 
 function gc() {
   echo "pruning nix store"
