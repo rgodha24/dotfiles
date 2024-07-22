@@ -2,6 +2,7 @@ eval "$(fnm env --use-on-cd)"
 eval "$(zoxide init zsh)"
 
 export PATH="$PATH:/Users/rohangodha/.cargo/bin/"
+export GPG_TTY=$(tty)
 
 alias cd="z"
 alias ls="eza"

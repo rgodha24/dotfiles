@@ -21,6 +21,7 @@
           bat
           zoxide
           jq
+          gnupg
 
           rustup
 
