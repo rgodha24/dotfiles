@@ -22,8 +22,7 @@
           zoxide
           jq
           gnupg
-
-          rustup
+          fzf
 
           neovim
 
@@ -40,8 +39,11 @@
           alejandra # for nix
           tailwindcss-language-server
 
-          # java
+          # language tools
           zulu
+          rustup
+          go
+          gopls
 
           # random dev deps
           gnum4
