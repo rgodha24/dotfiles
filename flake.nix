@@ -8,7 +8,10 @@
     nixpkgs,
   }: {
     packages."aarch64-darwin".default = let
-      pkgs = nixpkgs.legacyPackages."aarch64-darwin";
+      pkgs = import nixpkgs {
+        system = "aarch64-darwin";
+        # config.allowUnfree = true;
+      };
     in
       pkgs.buildEnv {
         name = "home-packages";
@@ -23,8 +26,14 @@
           jq
           gnupg
           fzf
+          ffmpeg_7-headless
+
 
           neovim
+          # really wish i could install it with nix, but it's only setup for linux
+          # im only really using it as a non-lsp text editor for classes
+          # sublime
+
 
           corepack
           bun
@@ -40,7 +49,8 @@
           tailwindcss-language-server
 
           # language tools
-          zulu
+          zulu11
+          jdt-language-server
           rustup
           go
           gopls
