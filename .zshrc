@@ -12,10 +12,6 @@ alias cd="z"
 alias ls="eza"
 alias lg="lazygit"
 
-if [ -f ~/dotfiles/.zsh-secrets ]; then
-  source ~/dotfiles/.zsh-secrets
-fi
-
 function gc() {
   echo "pruning nix store"
   nix store gc
@@ -32,5 +28,14 @@ function nixup() {
 function ros-shell() {
   nix develop ~/dotfiles/ros-shell/
 }
+
+_cryptenv_autoload_hook () {
+  eval "$(cryptenv load)"
+}
+add-zsh-hook chpwd _cryptenv_autoload_hook
+
+# workaround for creating a new shell in warp with Cmd + T not calling chpwd
+eval $(cryptenv load)
+
 
 . "$HOME/.cargo/env"
