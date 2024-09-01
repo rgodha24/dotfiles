@@ -27,13 +27,12 @@
           gnupg
           fzf
           ffmpeg_7-headless
-
+          cachix
 
           neovim
           # really wish i could install it with nix, but it's only setup for linux
           # im only really using it as a non-lsp text editor for classes
           # sublime
-
 
           corepack
           bun
@@ -49,7 +48,7 @@
           tailwindcss-language-server
 
           # language tools
-          zulu11
+          zulu17
           jdt-language-server
           rustup
           go

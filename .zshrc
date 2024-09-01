@@ -2,7 +2,7 @@ eval "$(fnm env --use-on-cd)"
 eval "$(zoxide init zsh)"
 
 export PATH="$PATH:/Users/rohangodha/.cargo/bin/:/Users/rohangodha/.bun/bin:/Users/rohangodha/.sst/bin"
-export PATH="$PATH:/Applications/Sublime Text.app/Contents/SharedSupport/bin"
+export PATH="$PATH:/Applications/Sublime Text.app/Contents/SharedSupport/bin:/Users/rohangodha/.local/bin"
 export GPG_TTY=$(tty)
 
 export CLASSPATH=$(find ~/java-classes/ -name "*.jar" -type f -print0 | xargs -0 realpath | tr '\n' ':' | sed 's/:$//')
@@ -27,6 +27,10 @@ function gc() {
 
 function nixup() {
   nix profile upgrade dotfiles
+}
+
+function ros-shell() {
+  nix develop ~/dotfiles/ros-shell/
 }
 
 . "$HOME/.cargo/env"
