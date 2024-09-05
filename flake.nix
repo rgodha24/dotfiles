@@ -2,64 +2,65 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
   };
-
-  outputs = {
-    self,
-    nixpkgs,
-  }: {
-    packages."aarch64-darwin".default = let
-      pkgs = import nixpkgs {
-        system = "aarch64-darwin";
-        # config.allowUnfree = true;
-      };
+  outputs = { self, nixpkgs }:
+    let
+      supportedSystems = [ "x86_64-linux" "x86_64-darwin" "aarch64-linux" "aarch64-darwin" ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
     in
-      pkgs.buildEnv {
-        name = "home-packages";
-        paths = with pkgs; [
-          # general tools
-          ripgrep
-          eza
-          lazygit
-          gh
-          bat
-          zoxide
-          jq
-          gnupg
-          fzf
-          ffmpeg_7-headless
-          cachix
-
-          neovim
-          # really wish i could install it with nix, but it's only setup for linux
-          # im only really using it as a non-lsp text editor for classes
-          # sublime
-
-          corepack
-          bun
-          fnm
-          # only really used for gh copilot in neovim cuz it doesn't play nicely with fnm
-          nodejs_20
-
-          # formatters + lsps
-          prettierd
-          stylua
-          rustywind
-          alejandra # for nix
-          tailwindcss-language-server
-
-          # language tools
-          zulu17
-          jdt-language-server
-          rustup
-          go
-          gopls
-
-          # random dev deps
-          gnum4
-
-          # apps
-          localsend
-        ];
-      };
-  };
+    {
+      packages = forAllSystems (system:
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            # config.allowUnfree = true;
+          };
+        in
+        {
+          default = pkgs.buildEnv {
+            name = "home-packages";
+            paths = with pkgs; [
+              # general tools
+              ripgrep
+              eza
+              lazygit
+              gh
+              bat
+              zoxide
+              jq
+              gnupg
+              fzf
+              ffmpeg_7-headless
+              cachix
+              pulumictl
+              pulumi
+              pulumiPackages.pulumi-language-go
+              pulumiPackages.pulumi-language-nodejs
+              pulumiPackages.pulumi-language-python
+              neovim
+              corepack
+              bun
+              fnm
+              nodejs_20
+              # formatters + lsps
+              prettierd
+              stylua
+              rustywind
+              alejandra # for nix
+              tailwindcss-language-server
+              matlab-language-server
+              # language tools
+              zulu17
+              jdt-language-server
+              rustup
+              go
+              gopls
+              # random dev deps
+              gnum4
+              # apps
+              localsend
+            ];
+          };
+        }
+      );
+    };
 }

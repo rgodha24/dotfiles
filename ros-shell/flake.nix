@@ -27,6 +27,8 @@
                 demo-nodes-cpp
                 demo-nodes-py
                 turtlesim
+                ament-cmake
+                ament-cmake-core
                 # ... other ROS packages
               ];
             })
