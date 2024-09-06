@@ -27,8 +27,3 @@ function gc() {
 function nixup() {
   nix profile upgrade dotfiles
 }
-
-function ros-shell() {
-  nix develop ~/dotfiles/ros-shell/
-}
-
