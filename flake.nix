@@ -13,56 +13,75 @@
       system: let
         pkgs = import nixpkgs {
           inherit system;
-          # config.allowUnfree = true;
+          config.allowUnfree = true;
         };
+        macPackages =
+          if system == "aarch64-darwin"
+          then
+            with pkgs; [
+              pinentry_mac
+              xquartz
+            ]
+          else [];
       in {
         default = pkgs.buildEnv {
           name = "home-packages";
-          paths = with pkgs; [
-            # general tools
-            ripgrep
-            eza
-            lazygit
-            gh
-            bat
-            zoxide
-            jq
-            gnupg
-            fzf
-            ffmpeg_7-headless
-            cachix
+          paths = with pkgs;
+            [
+              # general tools
+              ripgrep
+              eza
+              lazygit
+              gh
+              bat
+              zoxide
+              jq
+              gnupg
+              fzf
+              ffmpeg_7-headless
+              cachix
+              typst
+              typst-lsp
+              typstyle
+              typst-live
+              taplo
+              just
+              delta
 
-            neovim
-            # really wish i could install it with nix, but it's only setup for linux
-            # im only really using it as a non-lsp text editor for classes
-            # sublime
+              neovim
+              # really wish i could install it with nix, but it's only setup for linux
+              # im only really using it as a non-lsp text editor for classes
+              # sublime
+              vscode
 
-            corepack
-            bun
-            fnm
-            # only really used for gh copilot in neovim cuz it doesn't play nicely with fnm
-            nodejs_20
+              corepack
+              bun
+              fnm
+              # only really used for gh copilot in neovim cuz it doesn't play nicely with fnm
+              nodejs_20
 
-            # formatters + lsps
-            prettierd
-            stylua
-            rustywind
-            alejandra # for nix
-            tailwindcss-language-server
+              # formatters + lsps
+              prettierd
+              stylua
+              rustywind
+              alejandra # for nix
+              tailwindcss-language-server
+              pyright
 
-            # language tools
-            zulu17
-            jdt-language-server
-            rustup
-            go
-            gopls
+              # language tools
+              zulu17
+              jdt-language-server
+              rustup
+              go
+              gopls
 
-            # random dev deps
-            gnum4
+              # random dev deps
+              gnum4
 
-            # apps
-            localsend
-          ];
+              # apps
+              localsend
+            ]
+            ++ macPackages;
         };
       }
     );

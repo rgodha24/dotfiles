@@ -24,4 +24,16 @@ M.general = {
 
 -- more keybinds!
 
+vim.g.clipboard = {
+  name = "clipboard",
+  copy = {
+    ["+"] = { "pbcopy" },
+    ["*"] = { "pbcopy" },
+  },
+  paste = {
+    ["+"] = { "pbpaste" },
+    ["*"] = { "pbpaste" },
+  },
+}
+
 return M

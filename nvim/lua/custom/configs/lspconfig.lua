@@ -16,6 +16,8 @@ local servers = {
   "astro",
   "gopls",
   "matlab_ls",
+  "typst_lsp",
+  "pyright"
 }
 
 for _, lsp in ipairs(servers) do
