@@ -48,18 +48,6 @@ local plugins = {
   },
 
   {
-    "zbirenbaum/copilot.lua",
-    cmd = "Copilot",
-    event = "InsertEnter",
-    config = function()
-      require("copilot").setup {
-        suggestion = { auto_trigger = true, debounce = 150, keymap = { accept = "<C-l>" } },
-        copilot_node_command = "/Users/rohangodha/.nix-profile/bin/node",
-      }
-    end,
-  },
-
-  {
     "kdheepak/lazygit.nvim",
     lazy = false,
     -- -- optional for floating window border decoration

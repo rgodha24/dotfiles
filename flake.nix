@@ -48,6 +48,12 @@
               just
               delta
 
+              # pulumi stuff
+              pulumictl
+              pulumiPackages.pulumi-language-nodejs
+              pulumiPackages.pulumi-language-python
+              pulumiPackages.pulumi-language-go
+
               neovim
               # really wish i could install it with nix, but it's only setup for linux
               # im only really using it as a non-lsp text editor for classes
@@ -57,8 +63,6 @@
               corepack
               bun
               fnm
-              # only really used for gh copilot in neovim cuz it doesn't play nicely with fnm
-              nodejs_20
 
               # formatters + lsps
               prettierd
