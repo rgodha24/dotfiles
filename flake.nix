@@ -78,6 +78,7 @@
               rustup
               go
               gopls
+              typescript
 
               # random dev deps
               gnum4

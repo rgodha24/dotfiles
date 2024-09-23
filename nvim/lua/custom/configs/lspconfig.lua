@@ -13,11 +13,10 @@ local servers = {
   "tailwindcss",
   "prismals",
   "jdtls",
-  "astro",
   "gopls",
   "matlab_ls",
   "typst_lsp",
-  "pyright"
+  "pyright",
 }
 
 for _, lsp in ipairs(servers) do
@@ -26,6 +25,16 @@ for _, lsp in ipairs(servers) do
     capabilities = capabilities,
   }
 end
+
+lspconfig.astro.setup {
+  on_attach = on_attach,
+  capabilities = capabilities,
+  init_options = {
+    typescript = {
+      tsdk = vim.fs.normalize "~/.nix-profile/lib/node_modules/typescript/lib",
+    },
+  },
+}
 
 --
 -- lspconfig.pyright.setup { blabla}
