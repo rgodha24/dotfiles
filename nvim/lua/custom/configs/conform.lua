@@ -19,6 +19,7 @@ local options = {
     typst = { "typstyle" },
 
     toml = { "taplo" },
+    kotlin = { "ktlint" },
   },
 
   -- adding same formatter for multiple filetypes can look too much work for some

@@ -17,6 +17,7 @@ local servers = {
   "matlab_ls",
   "typst_lsp",
   "pyright",
+  "kotlin_language_server",
 }
 
 for _, lsp in ipairs(servers) do

@@ -11,9 +11,12 @@ export GPG_TTY=$(tty)
 export CLASSPATH=$(find ~/java-classes/ -name "*.jar" -type f -print0 | xargs -0 realpath | tr '\n' ':' | sed 's/:$//')
 export CLASSPATH=".:$CLASSPATH"
 
+export ANDROID_HOME="/Volumes/External/Android/sdk/"
+
 alias cd="z"
 alias ls="eza"
 alias lg="lazygit"
+alias config="nvim ~/dotfiles/flake.nix && nixup"
 
 function gc() {
   echo "pruning nix store"

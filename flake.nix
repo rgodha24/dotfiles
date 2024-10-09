@@ -71,6 +71,8 @@
               alejandra # for nix
               tailwindcss-language-server
               pyright
+              kotlin-language-server
+              ktlint
 
               # language tools
               zulu17
