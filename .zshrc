@@ -5,6 +5,14 @@ export PATH="$PATH:/Applications/Sublime Text.app/Contents/SharedSupport/bin:/Us
 eval "$(fnm env --use-on-cd)"
 eval "$(zoxide init zsh)"
 eval "$(cryptenv init zsh)"
+eval "$(starship init zsh)"
+
+if [[ -n "$KITTY_INSTALLATION_DIR" ]]; then
+  export KITTY_SHELL_INTEGRATION="enabled"
+  autoload -Uz -- "$KITTY_INSTALLATION_DIR"/shell-integration/zsh/kitty-integration
+  kitty-integration
+  unfunction kitty-integration
+fi
 
 export GPG_TTY=$(tty)
 

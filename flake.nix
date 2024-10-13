@@ -54,12 +54,13 @@
               pulumiPackages.pulumi-language-python
               pulumiPackages.pulumi-language-go
 
+              # terminal + editing
+              starship
+              kitty
               neovim
-              # really wish i could install it with nix, but it's only setup for linux
-              # im only really using it as a non-lsp text editor for classes
-              # sublime
               vscode
 
+              # js tooling
               corepack
               bun
               fnm
@@ -81,12 +82,6 @@
               go
               gopls
               typescript
-
-              # random dev deps
-              gnum4
-
-              # apps
-              localsend
             ]
             ++ macPackages;
         };
