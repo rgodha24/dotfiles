@@ -38,3 +38,12 @@ function gc() {
 function nixup() {
   nix profile upgrade dotfiles
 }
+
+# because `nix shell` doesn't work well with starship https://github.com/NixOS/nix/issues/6677
+function shell() {
+  export IN_NIX_SHELL="impure"
+  export name="$1"
+  nix shell nixpkgs#$1
+  unset IN_NIX_SHELL
+  unset name
+}

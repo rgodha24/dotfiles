@@ -12,23 +12,32 @@ $git_status\
 $nodejs\
 $rust\
 $golang\
-$php\
+$nix_shell\
 [](fg:#212736 bg:#1d2230)\
-$time\
+$custom\
 [ ](fg:#1d2230)\
 \n$character"""
+
+right_format = """
+[░▒▓](#a3aed2)\
+$time
+[](fg:#1d2230)\
+"""
+
+# 5s timeout mainly for fnm
+command_timeout = 5000
 
 [directory]
 style = "fg:#e3e5e5 bg:#769ff0"
 format = "[ $path ]($style)"
-truncation_length = 3
-truncation_symbol = "…/"
+truncation_length = 5
 
 [directory.substitutions]
 "Documents" = "󰈙 "
 "Downloads" = " "
 "Music" = " "
 "Pictures" = " "
+"Developer" = " "
 
 [git_branch]
 symbol = ""
@@ -54,13 +63,19 @@ symbol = ""
 style = "bg:#212736"
 format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
 
-[php]
-symbol = ""
-style = "bg:#212736"
-format = '[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)'
+[nix_shell]
+disabled = false
+symbol = "󱄅"
+format = '[[ $symbol ($name) ](fg:#769ff0 bg:#212736)]($style)'
 
 [time]
 disabled = false
-time_format = "%R" # Hour:Minute Format
+time_format = "%X" # Hour:Minute::Second Format
 style = "bg:#1d2230"
 format = '[[  $time ](fg:#a0a9cb bg:#1d2230)]($style)'
+
+[custom.cryptenv]
+command = "cryptenv project"
+when = "cryptenv project"
+symbol = ""
+format = '[[ $symbol $output ](fg:#a0a9cb bg:#1d2230)]($style)'
