@@ -59,6 +59,7 @@
               kitty
               neovim
               vscode
+              fish
 
               # js tooling
               corepack

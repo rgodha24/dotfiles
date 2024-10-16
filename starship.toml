@@ -16,16 +16,18 @@ $nix_shell\
 [](fg:#212736 bg:#1d2230)\
 $custom\
 [ ](fg:#1d2230)\
+$fill\
+[](fg:#1d2230)\
+$time\
+[█▓▒](#a3aed2)\
+[](bg:#1A1B26 fg:#4D5267)\
 \n$character"""
-
-right_format = """
-[░▒▓](#a3aed2)\
-$time
-[](fg:#1d2230)\
-"""
 
 # 5s timeout mainly for fnm
 command_timeout = 5000
+
+[fill]
+symbol = " "
 
 [directory]
 style = "fg:#e3e5e5 bg:#769ff0"
@@ -75,7 +77,8 @@ style = "bg:#1d2230"
 format = '[[  $time ](fg:#a0a9cb bg:#1d2230)]($style)'
 
 [custom.cryptenv]
-command = "cryptenv project"
-when = "cryptenv project"
+command = "cryptenv project list $(cryptenv project name) | wc -l"
+when = "cryptenv project name"
 symbol = ""
 format = '[[ $symbol $output ](fg:#a0a9cb bg:#1d2230)]($style)'
+
