@@ -1,10 +1,15 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
   outputs = {
     self,
     nixpkgs,
+    fenix,
   }: let
     supportedSystems = ["aarch64-linux" "aarch64-darwin"];
     forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -47,6 +52,8 @@
               taplo
               just
               delta
+              aoc-cli
+              mold
 
               # pulumi stuff
               pulumictl
@@ -79,10 +86,13 @@
               # language tools
               zulu17
               jdt-language-server
-              rustup
               go
               gopls
               typescript
+              (fenix.packages.${system}.fromToolchainFile {
+                dir = ./.;
+                sha256 = "sha256-yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
+              })
             ]
             ++ macPackages;
         };

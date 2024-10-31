@@ -1,4 +1,5 @@
-set -x PATH $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/"
+# prefer things in nix-profile over default macos installs
+set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" 
 
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
@@ -11,9 +12,9 @@ function starship_transient_prompt_func
 end
 enable_transience
 
-set -lx GPG_TTY "$(tty)"
-set -lx CLASSPATH "$(find ~/java-classes/ -name "*.jar" -type f -print0 | xargs -0 realpath | tr '\n' ':' | sed 's/:$//'):."
-set -lx ANDROID_HOME "/Volumes/External/Android/sdk/"
+set -x GPG_TTY "$(tty)"
+set -x CLASSPATH "$(find ~/java-classes/ -name "*.jar" -type f -print0 | xargs -0 realpath | tr '\n' ':' | sed 's/:$//'):."
+set -x ANDROID_HOME "/Volumes/External/Android/sdk/"
 set -x fish_greeting ""
 
 # kitty integration
@@ -35,7 +36,7 @@ function gc
   echo "pruning pnpm store"
   pnpm store prune
   echo "pruning bun cache"
-  bun pm cache rm
+  bun pm cache rm -g
 end
 
 function nixup
