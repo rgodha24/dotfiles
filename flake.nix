@@ -54,6 +54,7 @@
               delta
               aoc-cli
               mold
+              graphite-cli
 
               # pulumi stuff
               pulumictl
@@ -89,6 +90,7 @@
               go
               gopls
               typescript
+              nodejs_20
               (fenix.packages.${system}.fromToolchainFile {
                 dir = ./.;
                 sha256 = "sha256-yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";

@@ -59,7 +59,59 @@ local plugins = {
   {
     "wakatime/vim-wakatime",
     lazy = false,
-  }
+  },
+  {
+    "yetone/avante.nvim",
+    opts = {
+      provider = "copilot",
+      auto_suggestions_provider = "copilot",
+      copilot = {
+        model = "claude-3.5-sonnet",
+      },
+    },
+    lazy = false,
+    build = "make",
+    dependencies = {
+      "nvim-treesitter/nvim-treesitter",
+      "stevearc/dressing.nvim",
+      "nvim-lua/plenary.nvim",
+      "MunifTanjim/nui.nvim",
+      --- The below dependencies are optional,
+      "nvim-tree/nvim-web-devicons", -- or echasnovski/mini.icons
+      {
+        "zbirenbaum/copilot.lua",
+        event = "VeryLazy",
+        opts = {
+          copilot_node_command = vim.fn.expand "$HOME" .. "/.nix-profile/bin/node",
+        },
+      },
+      {
+        -- support for image pasting
+        "HakonHarnes/img-clip.nvim",
+        event = "VeryLazy",
+        opts = {
+          -- recommended settings
+          default = {
+            embed_image_as_base64 = false,
+            prompt_for_file_name = false,
+            drag_and_drop = {
+              insert_mode = true,
+            },
+            -- required for Windows users
+            use_absolute_path = true,
+          },
+        },
+      },
+      {
+        -- Make sure to set this up properly if you have lazy=true
+        "MeanderingProgrammer/render-markdown.nvim",
+        opts = {
+          file_types = { "Avante" },
+        },
+        ft = { "Avante" },
+      },
+    },
+  },
 
   -- To make a plugin not be loaded
   -- {

@@ -51,3 +51,8 @@ function shell
   set -e IN_NIX_SHELL
   set -e name
 end
+
+function aoc_submit
+  cargo download $argv[1]
+  cargo solve $argv[1] --release --submit $argv[2]
+end
