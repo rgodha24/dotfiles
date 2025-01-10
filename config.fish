@@ -14,7 +14,7 @@ enable_transience
 
 set -x GPG_TTY "$(tty)"
 set -x CLASSPATH "$(find ~/java-classes/ -name "*.jar" -type f -print0 | xargs -0 realpath | tr '\n' ':' | sed 's/:$//'):."
-set -x ANDROID_HOME "/Volumes/External/Android/sdk/"
+set -x ANDROID_HOME "$HOME/Developer/Android/sdk/"
 set -x fish_greeting ""
 
 # kitty integration

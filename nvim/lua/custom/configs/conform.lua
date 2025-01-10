@@ -6,13 +6,14 @@ local options = {
     lua = { "stylua" },
 
     javascript = { "prettierd" },
-    javascriptreact = { "prettierd" },
+    javascriptreact = { "prettierd", "rustywind" },
     typescript = { "prettierd" },
-    typescriptreact = { "prettierd" },
+    typescriptreact = { "prettierd", "rustywind" },
     css = { "prettierd" },
     html = { "prettierd", "rustywind" },
     svelte = { "prettierd", "rustywind" },
     astro = { "prettierd", "rustywind" },
+    python = { "ruff_fix", "ruff_format", "ruff_organize_imports" },
 
     rust = { "rustfmt" },
     nix = { "alejandra" },

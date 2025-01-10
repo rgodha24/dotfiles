@@ -18,6 +18,7 @@ local servers = {
   "typst_lsp",
   "pyright",
   "kotlin_language_server",
+  "ruff",
 }
 
 for _, lsp in ipairs(servers) do

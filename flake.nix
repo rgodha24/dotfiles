@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -25,7 +25,6 @@
           then
             with pkgs; [
               pinentry_mac
-              xquartz
             ]
           else [];
       in {
@@ -73,6 +72,10 @@
               corepack
               bun
               fnm
+
+              # python
+              uv
+              ruff
 
               # formatters + lsps
               prettierd
