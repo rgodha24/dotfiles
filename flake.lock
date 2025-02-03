@@ -23,11 +23,11 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1735411623,
-        "narHash": "sha256-0cqsdrWDSlBPbIaG+CopFEqYw+jJAsx+lOWKmObWJwo=",
+        "lastModified": 1736707779,
+        "narHash": "sha256-ws+KUT+7fwmoaNXqaf67GpL4ljP5KeXzVJMhz4NmZBA=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "3fcd78e32e950184312504ff913b7276999346d2",
+        "rev": "400d06196af415c7ac02216d3229a8c9dba1b635",
         "type": "github"
       },
       "original": {
@@ -37,10 +37,27 @@
         "type": "github"
       }
     },
+    "pkgsunstable": {
+      "locked": {
+        "lastModified": 1737062831,
+        "narHash": "sha256-Tbk1MZbtV2s5aG+iM99U8FqwxU/YNArMcWAv6clcsBc=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "5df43628fdf08d642be8ba5b3625a6c70731c19c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "fenix": "fenix",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "pkgsunstable": "pkgsunstable"
       }
     },
     "rust-analyzer-src": {

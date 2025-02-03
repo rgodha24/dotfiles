@@ -13,7 +13,6 @@ end
 enable_transience
 
 set -x GPG_TTY "$(tty)"
-set -x CLASSPATH "$(find ~/java-classes/ -name "*.jar" -type f -print0 | xargs -0 realpath | tr '\n' ':' | sed 's/:$//'):."
 set -x ANDROID_HOME "$HOME/Developer/Android/sdk/"
 set -x fish_greeting ""
 
@@ -55,4 +54,9 @@ end
 function aoc_submit
   cargo download $argv[1]
   cargo solve $argv[1] --release --submit $argv[2]
+end
+
+function circuitsim
+  cd $HOME/Developer/
+  java -jar "CS2110-CircuitSim.jar"
 end

@@ -1,6 +1,7 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -10,6 +11,7 @@
     self,
     nixpkgs,
     fenix,
+    pkgsunstable,
   }: let
     supportedSystems = ["aarch64-linux" "aarch64-darwin"];
     forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
@@ -17,6 +19,10 @@
     packages = forAllSystems (
       system: let
         pkgs = import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+        unstable = import pkgsunstable {
           inherit system;
           config.allowUnfree = true;
         };
@@ -70,11 +76,11 @@
 
               # js tooling
               corepack
-              bun
+              unstable.bun
               fnm
 
               # python
-              uv
+              unstable.uv
               ruff
 
               # formatters + lsps
@@ -82,10 +88,11 @@
               stylua
               rustywind
               alejandra # for nix
-              tailwindcss-language-server
+              unstable.tailwindcss-language-server
               pyright
               kotlin-language-server
               ktlint
+              djlint
 
               # language tools
               zulu17
@@ -96,8 +103,9 @@
               nodejs_20
               (fenix.packages.${system}.fromToolchainFile {
                 dir = ./.;
-                sha256 = "sha256-yMuSb5eQPO/bHv+Bcf/US8LVMbf/G/0MSfiPwBhiPpk=";
+                sha256 = "sha256-vMlz0zHduoXtrlu0Kj1jEp71tYFXyymACW8L4jzrzNA=";
               })
+              cargo-lambda
             ]
             ++ macPackages;
         };

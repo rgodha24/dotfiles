@@ -11,6 +11,7 @@ local options = {
     typescriptreact = { "prettierd", "rustywind" },
     css = { "prettierd" },
     html = { "prettierd", "rustywind" },
+    htmldjango = { "prettierd", "rustywind", "djlint" },
     svelte = { "prettierd", "rustywind" },
     astro = { "prettierd", "rustywind" },
     python = { "ruff_fix", "ruff_format", "ruff_organize_imports" },
