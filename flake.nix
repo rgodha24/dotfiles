@@ -86,7 +86,6 @@
               # formatters + lsps
               prettierd
               stylua
-              rustywind
               alejandra # for nix
               unstable.tailwindcss-language-server
               pyright

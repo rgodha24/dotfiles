@@ -40,8 +40,7 @@ local plugins = {
 
   {
     "stevearc/conform.nvim",
-    --  for users those who want auto-save conform + lazyloading!
-    -- event = "BufWritePre",
+    event = "BufWritePre",
     config = function()
       require "custom.configs.conform"
     end,
@@ -64,7 +63,6 @@ local plugins = {
     "yetone/avante.nvim",
     opts = {
       provider = "copilot",
-      auto_suggestions_provider = "copilot",
       copilot = {
         model = "claude-3.5-sonnet",
       },
@@ -76,8 +74,7 @@ local plugins = {
       "stevearc/dressing.nvim",
       "nvim-lua/plenary.nvim",
       "MunifTanjim/nui.nvim",
-      --- The below dependencies are optional,
-      "nvim-tree/nvim-web-devicons", -- or echasnovski/mini.icons
+      "nvim-tree/nvim-web-devicons",
       {
         "zbirenbaum/copilot.lua",
         event = "VeryLazy",
@@ -86,19 +83,15 @@ local plugins = {
         },
       },
       {
-        -- support for image pasting
         "HakonHarnes/img-clip.nvim",
         event = "VeryLazy",
         opts = {
-          -- recommended settings
           default = {
             embed_image_as_base64 = false,
             prompt_for_file_name = false,
             drag_and_drop = {
               insert_mode = true,
             },
-            -- required for Windows users
-            use_absolute_path = true,
           },
         },
       },
@@ -110,6 +103,18 @@ local plugins = {
         },
         ft = { "Avante" },
       },
+    },
+  },
+  {
+    "supermaven-inc/supermaven-nvim",
+    event = "InsertEnter",
+    opts = {
+      keymaps = {
+        accept_suggestion = "<C-l>",
+      },
+      condition = function()
+        return string.match(vim.fn.expand "%:p", vim.fn.expand "~/Classes")
+      end,
     },
   },
 

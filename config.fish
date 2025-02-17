@@ -36,6 +36,8 @@ function gc
   pnpm store prune
   echo "pruning bun cache"
   bun pm cache rm -g
+  echo "pruning uv cache"
+  uv cache prune
 end
 
 function nixup
