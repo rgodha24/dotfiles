@@ -15,7 +15,7 @@ local servers = {
   "jdtls",
   "gopls",
   "matlab_ls",
-  "typst_lsp",
+  "tinymist",
   "pyright",
   "kotlin_language_server",
   "ruff",

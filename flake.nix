@@ -48,10 +48,11 @@
               jq
               gnupg
               fzf
-              ffmpeg_7-headless
+              ffmpeg-full
+              yt-dlp
+
               cachix
               typst
-              typst-lsp
               typstyle
               typst-live
               taplo
@@ -60,6 +61,7 @@
               aoc-cli
               mold
               graphite-cli
+              unstable.devenv
 
               # pulumi stuff
               pulumictl
@@ -70,21 +72,12 @@
               # terminal + editing
               starship
               kitty
-              neovim
               vscode
               fish
+              neovim
 
-              # js tooling
-              corepack
-              unstable.bun
-              fnm
-
-              # python
-              unstable.uv
-              ruff
-
-              # formatters + lsps
-              prettierd
+              # formatters + lsps + editor plugins
+              unstable.prettierd
               stylua
               alejandra # for nix
               unstable.tailwindcss-language-server
@@ -92,6 +85,9 @@
               kotlin-language-server
               ktlint
               djlint
+              unstable.tinymist
+              luajitPackages.tiktoken_core
+              lynx
 
               # language tools
               zulu17
@@ -102,9 +98,23 @@
               nodejs_20
               (fenix.packages.${system}.fromToolchainFile {
                 dir = ./.;
-                sha256 = "sha256-vMlz0zHduoXtrlu0Kj1jEp71tYFXyymACW8L4jzrzNA=";
+                sha256 = "sha256-AJ6LX/Q/Er9kS15bn9iflkUwcgYqRQxiOIL2ToVAXaU=";
               })
               cargo-lambda
+
+              # js tooling
+              corepack
+              unstable.bun
+              fnm
+
+              # python
+              unstable.uv
+              ruff
+              (python312Full.withPackages (p:
+                with p; [
+                  numpy
+                  psutil
+                ]))
             ]
             ++ macPackages;
         };
