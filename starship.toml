@@ -78,7 +78,7 @@ style = "bg:#1d2230"
 format = '[[  $time ](fg:#a0a9cb bg:#1d2230)]($style)'
 
 [custom.cryptenv]
-command = "cryptenv project list $(cryptenv project name) | wc -l"
+command = "cryptenv variables | wc -l"
 when = "cryptenv project name"
 symbol = ""
 format = '[[ $symbol $output ](fg:#a0a9cb bg:#1d2230)]($style)'

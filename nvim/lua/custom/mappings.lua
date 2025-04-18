@@ -16,6 +16,14 @@ M.general = {
       ":LazyGit<CR>",
       "open lazygit",
     },
+    ["<leader>sv"] = {
+      ":vsplit<CR>",
+      "split vertically",
+    },
+    ["<leader>sh"] = {
+      ":split<CR>",
+      "split horizontally",
+    },
   },
   v = {
     [">"] = { ">gv", "indent" },

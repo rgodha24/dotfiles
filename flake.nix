@@ -2,15 +2,10 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
     pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
-    fenix = {
-      url = "github:nix-community/fenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
   outputs = {
     self,
     nixpkgs,
-    fenix,
     pkgsunstable,
   }: let
     supportedSystems = ["aarch64-linux" "aarch64-darwin"];
@@ -50,6 +45,9 @@
               fzf
               ffmpeg-full
               yt-dlp
+              gimp
+              gnuplot
+              gimp
 
               cachix
               typst
@@ -62,6 +60,7 @@
               mold
               graphite-cli
               unstable.devenv
+              turso-cli
 
               # pulumi stuff
               pulumictl
@@ -96,10 +95,7 @@
               gopls
               typescript
               nodejs_20
-              (fenix.packages.${system}.fromToolchainFile {
-                dir = ./.;
-                sha256 = "sha256-AJ6LX/Q/Er9kS15bn9iflkUwcgYqRQxiOIL2ToVAXaU=";
-              })
+              rustup
               cargo-lambda
 
               # js tooling
@@ -110,7 +106,7 @@
               # python
               unstable.uv
               ruff
-              (python312Full.withPackages (p:
+              (python310Full.withPackages (p:
                 with p; [
                   numpy
                   psutil

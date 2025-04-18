@@ -65,6 +65,7 @@ local plugins = {
       provider = "copilot",
       copilot = {
         model = "claude-3.7-sonnet",
+        disabled_tools = { "python" },
       },
     },
     lazy = false,

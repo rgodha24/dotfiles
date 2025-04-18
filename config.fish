@@ -28,6 +28,8 @@ alias ls="eza"
 alias lg="lazygit"
 alias config="nvim ~/dotfiles/flake.nix && nixup"
 alias where="which"
+alias n="nvim ."
+alias t="exa -T --git-ignore"
 
 function gc 
   echo "pruning nix store"
