@@ -2,7 +2,6 @@ local overrides = require "custom.configs.overrides"
 
 ---@type NvPluginSpec[]
 local plugins = {
-
   -- Override plugin definition options
 
   {
@@ -49,17 +48,19 @@ local plugins = {
   {
     "kdheepak/lazygit.nvim",
     lazy = false,
-    -- -- optional for floating window border decoration
-    -- dependencies = {
-    --   "nvim-lua/plenary.nvim",
-    -- },
+    dependencies = {
+      "nvim-lua/plenary.nvim",
+    },
   },
 
   {
     "wakatime/vim-wakatime",
     lazy = false,
   },
-  {
+}
+
+if vim.fn.has "mac" == 1 then
+  table.insert(plugins, {
     "yetone/avante.nvim",
     opts = {
       provider = "copilot",
@@ -97,7 +98,6 @@ local plugins = {
         },
       },
       {
-        -- Make sure to set this up properly if you have lazy=true
         "MeanderingProgrammer/render-markdown.nvim",
         opts = {
           file_types = { "Avante" },
@@ -105,8 +105,8 @@ local plugins = {
         ft = { "Avante" },
       },
     },
-  },
-  {
+  })
+  table.insert(plugins, {
     "supermaven-inc/supermaven-nvim",
     event = "InsertEnter",
     opts = {
@@ -114,24 +114,11 @@ local plugins = {
         accept_suggestion = "<C-l>",
       },
       condition = function()
+        -- no autocomplete on school work
         return string.match(vim.fn.expand "%:p", vim.fn.expand "~/Classes")
       end,
     },
-  },
-
-  -- To make a plugin not be loaded
-  -- {
-  --   "NvChad/nvim-colorizer.lua",
-  --   enabled = false
-  -- },
-
-  -- All NvChad plugins are lazy-loaded by default
-  -- For a plugin to be loaded, you will need to set either `ft`, `cmd`, `keys`, `event`, or set `lazy = false`
-  -- If you want a plugin to load on startup, add `lazy = false` to a plugin spec, for example
-  -- {
-  --   "mg979/vim-visual-multi",
-  --   lazy = false,
-  -- }
-}
+  })
+end
 
 return plugins

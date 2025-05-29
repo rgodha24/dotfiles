@@ -8,7 +8,7 @@
     nixpkgs,
     pkgsunstable,
   }: let
-    supportedSystems = ["aarch64-linux" "aarch64-darwin"];
+    supportedSystems = ["x86_64-linux" "aarch64-darwin"];
     forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
   in {
     packages = forAllSystems (
@@ -49,6 +49,7 @@
               gnuplot
               gimp
               htop
+              unzip
 
               cachix
               typst
@@ -68,7 +69,6 @@
 
               # terminal + editing
               starship
-              vscode
               fish
               neovim
 
@@ -94,6 +94,8 @@
               nodejs_20
               rustup
               cargo-lambda
+              zig_0_12
+              postgresql_17_jit
 
               # js tooling
               corepack

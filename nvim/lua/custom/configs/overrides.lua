@@ -211,6 +211,10 @@ M.nvimtree = {
     vim.keymap.set("x", "<leader>md", function()
       mark_visually "delete_marks"
     end, { desc = "Delete markings in visual selection" })
+
+    vim.keymap.set("n", "<leader>mD", function()
+      api.marks.clear()
+    end, { desc = "Delete all nvim-tree markings" })
   end,
 }
 

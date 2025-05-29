@@ -3,8 +3,10 @@ set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH
 
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
-cryptenv init fish | source
 zoxide init fish | source
+if type -q cryptenv
+    cryptenv init fish | source
+end
 
 # starship transient prompt https://starship.rs/advanced-config/#transientprompt-and-transientrightprompt-in-fish
 function starship_transient_prompt_func
@@ -16,13 +18,6 @@ set -x GPG_TTY "$(tty)"
 set -x ANDROID_HOME "$HOME/Developer/Android/sdk/"
 set -x fish_greeting ""
 set -x CLAUDE_CODE_USE_BEDROCK 1
-
-# kitty integration
-if set -q KITTY_INSTALLATION_DIR
-    set --global KITTY_SHELL_INTEGRATION enabled
-    source "$KITTY_INSTALLATION_DIR/shell-integration/fish/vendor_conf.d/kitty-shell-integration.fish"
-    set --prepend fish_complete_path "$KITTY_INSTALLATION_DIR/shell-integration/fish/vendor_completions.d"
-end
 
 alias cd="z"
 alias ls="eza"
@@ -58,4 +53,9 @@ end
 
 function ai
   cryptenv run ai -- $argv
+end
+
+function circuitsim
+  cd $HOME/Developer/
+  java -jar "CS2110-CircuitSim.jar"
 end
