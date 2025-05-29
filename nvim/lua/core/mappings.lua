@@ -146,7 +146,7 @@ M.lspconfig = {
 
     ["K"] = {
       function()
-        vim.lsp.buf.hover()
+        vim.lsp.buf.hover { border = "single", max_height = 25 }
       end,
       "LSP hover",
     },

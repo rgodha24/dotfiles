@@ -1,5 +1,5 @@
 # prefer things in nix-profile over default macos installs
-set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" 
+set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" 
 
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
@@ -15,6 +15,7 @@ enable_transience
 set -x GPG_TTY "$(tty)"
 set -x ANDROID_HOME "$HOME/Developer/Android/sdk/"
 set -x fish_greeting ""
+set -x CLAUDE_CODE_USE_BEDROCK 1
 
 # kitty integration
 if set -q KITTY_INSTALLATION_DIR
@@ -55,16 +56,6 @@ function shell
   set -e name
 end
 
-function aoc_submit
-  cargo download $argv[1]
-  cargo solve $argv[1] --release --submit $argv[2]
+function ai
+  cryptenv run ai -- $argv
 end
-
-function circuitsim
-  cd $HOME/Developer/
-  java -jar "CS2110-CircuitSim.jar"
-end
-
-# Added by OrbStack: command-line tools and integration
-# This won't be added again if you remove it.
-source ~/.orbstack/shell/init2.fish 2>/dev/null || :

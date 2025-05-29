@@ -137,20 +137,6 @@ M.nvimtree = {
       vim.notify(message, level)
     end
 
-    local function edit_or_open()
-      local node = api.tree.get_node_under_cursor()
-
-      if node.nodes ~= nil then
-        -- expand or collapse folder
-        api.node.open.edit()
-      else
-        -- open file
-        api.node.open.edit()
-        -- Close the tree if file was opened
-        api.tree.close()
-      end
-    end
-
     -- https://github.com/nvim-tree/nvim-tree.lua/issues/2994#issuecomment-2688559143
     local function mark_visually(action)
       local view = require "nvim-tree.view"
@@ -214,15 +200,6 @@ M.nvimtree = {
     end
 
     vim.keymap.set("n", "<leader>y", copy_marked_to_clipboard, opts "Copy to AI chat")
-    vim.keymap.set("n", "l", function()
-      local node = api.tree.get_node_under_cursor()
-      if node.nodes ~= nil then
-        api.node.open.edit()
-      end
-    end, opts "Open folder")
-    vim.keymap.set("n", "h", api.tree.close, opts "Close")
-    vim.keymap.set("n", "H", api.tree.collapse_all, opts "Collapse All")
-
     vim.keymap.set("x", "<leader>mt", function()
       mark_visually "toggle"
     end, opts "Toggle Markings")

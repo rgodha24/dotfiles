@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-24.11";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
     pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
   outputs = {
@@ -48,6 +48,7 @@
               gimp
               gnuplot
               gimp
+              htop
 
               cachix
               typst
@@ -57,20 +58,16 @@
               just
               delta
               aoc-cli
-              mold
-              graphite-cli
               unstable.devenv
-              turso-cli
 
               # pulumi stuff
               pulumictl
-              pulumiPackages.pulumi-language-nodejs
-              pulumiPackages.pulumi-language-python
-              pulumiPackages.pulumi-language-go
+              pulumiPackages.pulumi-nodejs
+              pulumiPackages.pulumi-python
+              pulumiPackages.pulumi-go
 
               # terminal + editing
               starship
-              kitty
               vscode
               fish
               neovim
@@ -106,11 +103,7 @@
               # python
               unstable.uv
               ruff
-              (python310Full.withPackages (p:
-                with p; [
-                  numpy
-                  psutil
-                ]))
+              python310Full
             ]
             ++ macPackages;
         };
