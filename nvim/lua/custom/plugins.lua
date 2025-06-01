@@ -59,7 +59,8 @@ local plugins = {
   },
 }
 
-if vim.fn.has "mac" == 1 then
+-- AI Sabbath https://x.com/Aizkmusic/status/1928971710566482397
+if vim.fn.has "mac" == 1 and (os.date "%A" ~= "Saturday") then
   table.insert(plugins, {
     "yetone/avante.nvim",
     opts = {
