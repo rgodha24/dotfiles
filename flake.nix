@@ -21,6 +21,7 @@
           inherit system;
           config.allowUnfree = true;
         };
+
         macPackages =
           if system == "aarch64-darwin"
           then
@@ -95,7 +96,7 @@
               rustup
               cargo-lambda
               zig_0_12
-              postgresql_17_jit
+              postgresql_16_jit
 
               # js tooling
               corepack
@@ -105,7 +106,7 @@
               # python
               unstable.uv
               ruff
-              python310Full
+              python314
             ]
             ++ macPackages;
         };

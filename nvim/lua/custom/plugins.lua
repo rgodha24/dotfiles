@@ -46,11 +46,17 @@ local plugins = {
   },
 
   {
-    "kdheepak/lazygit.nvim",
-    lazy = false,
-    dependencies = {
-      "nvim-lua/plenary.nvim",
+    "folke/snacks.nvim",
+    keys = {
+      {
+        "<leader>gg",
+        function()
+          Snacks.lazygit()
+        end,
+        desc = "Lazygit",
+      },
     },
+    opts = { lazygit = { enabled = true } },
   },
 
   {
@@ -66,7 +72,7 @@ if vim.fn.has "mac" == 1 and (os.date "%A" ~= "Saturday") then
     opts = {
       provider = "copilot",
       copilot = {
-        model = "claude-3.7-sonnet",
+        model = "claude-sonnet-4",
         disabled_tools = { "python" },
       },
     },

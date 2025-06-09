@@ -12,10 +12,6 @@ M.general = {
       end,
       "formatting",
     },
-    ["<leader>gg"] = {
-      ":LazyGit<CR>",
-      "open lazygit",
-    },
     ["<leader>sv"] = {
       ":vsplit<CR>",
       "split vertically",
