@@ -14,6 +14,7 @@ local options = {
     htmldjango = { "prettierd" },
     svelte = { "prettierd" },
     astro = { "prettierd" },
+    markdown = { "prettierd" },
     python = { "ruff_fix", "ruff_format", "ruff_organize_imports" },
 
     rust = { "rustfmt" },

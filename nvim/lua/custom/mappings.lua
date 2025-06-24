@@ -5,6 +5,13 @@ M.general = {
   n = {
     [";"] = { ":", "enter command mode", opts = { nowait = true } },
 
+    ["<C-c>"] = {
+      function()
+        require("custom.utils").copy_current_buffer()
+      end,
+      "Copy buffer to AI Chat",
+    },
+
     --  format with conform
     ["<leader>fm"] = {
       function()
@@ -42,8 +49,8 @@ else
   vim.g.clipboard = {
     name = "WslClipboard",
     copy = {
-      ["+"] = { "clip.exe" },
-      ["*"] = { "clip.exe" },
+      ["+"] = { "sh", "-c", "iconv -f utf8 -t utf16le | clip.exe" },
+      ["*"] = { "sh", "-c", "iconv -f utf8 -t utf16le | clip.exe" },
     },
     paste = {
       ["+"] = { "powershell.exe", "-c", '[Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))' },

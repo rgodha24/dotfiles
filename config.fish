@@ -18,6 +18,7 @@ set -x GPG_TTY "$(tty)"
 set -x ANDROID_HOME "$HOME/Developer/Android/sdk/"
 set -x fish_greeting ""
 set -x CLAUDE_CODE_USE_BEDROCK 1
+set -x EDITOR "nvim"
 
 alias cd="z"
 alias ls="eza"

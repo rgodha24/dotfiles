@@ -1,6 +1,7 @@
 # dotfiles
 
-what I use: 
+what I use:
+
 - [nix](https://nixos.org/), the package manager, not the OS.
 - [neovim](https://neovim.io/). my config is based off of [nvchad 2.0](https://nvchad.com/)
 - [kitty](https://sw.kovidgoyal.net/kitty/). really nice terminal emulator

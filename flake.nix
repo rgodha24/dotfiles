@@ -29,6 +29,11 @@
               pinentry_mac
             ]
           else [];
+
+        linuxPackages =
+          if system == "x86_64-linux"
+          then with pkgs; [xdg-utils graphviz]
+          else [];
       in {
         default = pkgs.buildEnv {
           name = "home-packages";
@@ -79,9 +84,6 @@
               alejandra # for nix
               unstable.tailwindcss-language-server
               pyright
-              kotlin-language-server
-              ktlint
-              djlint
               unstable.tinymist
               luajitPackages.tiktoken_core
               lynx
@@ -108,7 +110,7 @@
               ruff
               python314
             ]
-            ++ macPackages;
+            ++ macPackages ++ linuxPackages;
         };
       }
     );

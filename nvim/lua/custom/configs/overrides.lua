@@ -1,4 +1,5 @@
 local M = {}
+local utils = require "custom.utils"
 
 M.treesitter = {
   ensure_installed = {
@@ -117,24 +118,12 @@ M.nvimtree = {
           read_errors = read_errors + 1
         end
 
-        -- Format the block
-        local formatted_block = string.format("```%s %s\n%s\n```", filetype, relative_path, content)
-        table.insert(final_content_blocks, formatted_block)
+        table.insert(final_content_blocks, utils.fmt_block(filetype, relative_path, content))
       end
-
-      -- Concatenate all blocks
-      local final_string = table.concat(final_content_blocks, "\n\n") -- Add blank line between blocks
-
-      -- Copy to system clipboard (register '+')
-      vim.fn.setreg("+", final_string)
 
       local message = string.format("NvimTree: Copied content of %d file(s) to clipboard.", #files_to_process)
-      local level = vim.log.levels.INFO
-      if read_errors > 0 then
-        message = message .. string.format(" (%d file(s) could not be read).", read_errors)
-        level = vim.log.levels.WARN
-      end
-      vim.notify(message, level)
+      local level = read_errors > 0 and vim.log.levels.WARN or vim.log.levels.INFO
+      utils.copy_blocks(final_content_blocks, message, level)
     end
 
     -- https://github.com/nvim-tree/nvim-tree.lua/issues/2994#issuecomment-2688559143
