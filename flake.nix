@@ -56,6 +56,7 @@
               gimp
               htop
               unzip
+              btop
 
               cachix
               typst
@@ -76,7 +77,9 @@
               # terminal + editing
               starship
               fish
-              neovim
+              unstable.neovim
+              unstable.vscode
+              unstable.code-cursor
 
               # formatters + lsps + editor plugins
               unstable.prettierd
