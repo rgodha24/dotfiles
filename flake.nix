@@ -66,7 +66,6 @@
               just
               delta
               aoc-cli
-              unstable.devenv
 
               # pulumi stuff
               pulumictl
