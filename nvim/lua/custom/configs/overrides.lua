@@ -204,6 +204,21 @@ M.nvimtree = {
     vim.keymap.set("n", "<leader>mD", function()
       api.marks.clear()
     end, { desc = "Delete all nvim-tree markings" })
+
+    vim.keymap.set("n", "o", function()
+      local node = api.tree.get_node_under_cursor()
+      if node then
+        vim.fn.system("fish -c 'open " .. vim.fn.shellescape(node.absolute_path) .. "'")
+      end
+    end, opts "Open file with system default")
+
+    vim.keymap.set("n", "O", function()
+      local node = api.tree.get_node_under_cursor()
+      if node then
+        local folder_path = node.type == "directory" and node.absolute_path or vim.fn.fnamemodify(node.absolute_path, ":h")
+        vim.fn.system("fish -c 'open " .. vim.fn.shellescape(folder_path) .. "'")
+      end
+    end, opts "Open enclosing folder")
   end,
 }
 

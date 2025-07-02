@@ -32,7 +32,7 @@
 
         linuxPackages =
           if system == "x86_64-linux"
-          then with pkgs; [xdg-utils graphviz]
+          then with pkgs; [xdg-utils graphviz k9s]
           else [];
       in {
         default = pkgs.buildEnv {
@@ -100,7 +100,7 @@
               rustup
               cargo-lambda
               zig_0_12
-              postgresql_16_jit
+              postgresql_17_jit
 
               # js tooling
               corepack
