@@ -128,10 +128,8 @@ M.nvimtree = {
 
     -- https://github.com/nvim-tree/nvim-tree.lua/issues/2994#issuecomment-2688559143
     local function mark_visually(action)
-      local view = require "nvim-tree.view"
-
       -- Check if nvim-tree is visible
-      if not view.is_visible() then
+      if not api.tree.is_visible() then
         print "This function can only be run in nvim-tree."
         return
       end
@@ -147,7 +145,7 @@ M.nvimtree = {
       vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<Esc>", true, false, true), "x", false)
 
       -- Get the nvim-tree window and buffer
-      local winid = view.get_winnr()
+      local winid = api.tree.winid()
       local bufnr = vim.api.nvim_win_get_buf(winid)
 
       -- Switch to the nvim-tree window
@@ -215,7 +213,8 @@ M.nvimtree = {
     vim.keymap.set("n", "O", function()
       local node = api.tree.get_node_under_cursor()
       if node then
-        local folder_path = node.type == "directory" and node.absolute_path or vim.fn.fnamemodify(node.absolute_path, ":h")
+        local folder_path = node.type == "directory" and node.absolute_path
+          or vim.fn.fnamemodify(node.absolute_path, ":h")
         vim.fn.system("fish -c 'open " .. vim.fn.shellescape(folder_path) .. "'")
       end
     end, opts "Open enclosing folder")
