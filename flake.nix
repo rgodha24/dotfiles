@@ -24,6 +24,7 @@
           home-manager = {
             useGlobalPkgs = true;
             useUserPackages = true;
+            backupFileExtension = "backup";
             users.rgodha = {
               imports = [./home.nix];
               home.stateVersion = "25.05";
