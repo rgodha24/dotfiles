@@ -7,10 +7,12 @@
     };
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
     zen-browser.url = "github:0xc000022070/zen-browser-flake";
+    pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
   outputs = {
     nixpkgs,
+    pkgsunstable,
     home-manager,
     determinate,
     zen-browser,
@@ -34,11 +36,14 @@
               ];
               home.stateVersion = "25.05";
             };
-            extraSpecialArgs = { inherit zen-browser; system = "x86_64-linux"; };
+            extraSpecialArgs = {
+              inherit zen-browser;
+              inherit pkgsunstable;
+              system = "x86_64-linux";
+            };
           };
         }
       ];
     };
   };
 }
-

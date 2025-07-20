@@ -1,10 +1,16 @@
 {
   config,
   pkgs,
+  pkgsunstable,
   zen-browser,
   system,
   ...
-}: {
+}: let
+  unstable = import pkgsunstable {
+    inherit system;
+    config.allowUnfree = true;
+  };
+in {
   home.username = "rgodha";
   home.homeDirectory = "/home/rgodha";
   home.stateVersion = "25.05";
@@ -29,7 +35,7 @@
 
     # Development tools
     git
-    neovim
+    unstable.neovim
     fnm
     nodejs_20
     go
@@ -84,8 +90,8 @@
     pulumiPackages.pulumi-go
 
     # guis
-    vscode
-    code-cursor
+    unstable.vscode
+    unstable.code-cursor
     beeper
 
     # Formatters and LSPs
@@ -106,7 +112,7 @@
     postgresql_17_jit
 
     corepack
-    bun
+    unstable.bun
 
     uv
     ruff
