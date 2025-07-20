@@ -87,7 +87,6 @@
     vscode
     code-cursor
     beeper
-    zen-browser.packages."${system}".twilight
 
     # Formatters and LSPs
     prettierd
