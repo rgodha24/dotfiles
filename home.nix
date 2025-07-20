@@ -1,6 +1,8 @@
 {
   config,
   pkgs,
+  zen-browser,
+  system,
   ...
 }: {
   home.username = "rgodha";
@@ -66,6 +68,9 @@
     # Nix tools
     cachix
 
+    # Browser
+    zen-browser.packages."${system}".twilight
+
     # Document tools
     typst
     typstyle
@@ -121,19 +126,18 @@
   programs.git = {
     enable = true;
     userName = "Rohan Godha";
-    userEmail = "your-email@example.com"; # Update this
+    userEmail = "git@rohangodha.com";
+    extraConfig = {
+      init.defaultBranch = "main";
+    };
   };
 
-  # Fish shell configuration
+  # shell stuff
   programs.fish = {
     enable = true;
     interactiveShellInit = builtins.readFile ./config.fish;
   };
-
-  # Starship prompt configuration
   programs.starship.enable = true;
-
-  # Config files
   home.file.".config/starship.toml".source = ./starship.toml;
   home.file.".config/ghostty/config".source = ./ghostty.config;
 
@@ -164,11 +168,32 @@
   services.hyprpaper.enable = true;
   home.file.".config/hypr/hyprpaper.conf".source = ./hyprpaper.conf;
 
+  # Zen Browser configuration
+  programs.zen-browser = {
+    enable = true;
+    policies = {
+      DisableAppUpdate = true;
+      DisableTelemetry = true;
+      DontCheckDefaultBrowser = true;
+      ExtensionSettings = {
+        # Bitwarden
+        "{446900e4-71c2-419f-a6a7-df9c091e268b}" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/bitwarden-password-manager/latest.xpi";
+          installation_mode = "force_installed";
+        };
+        # uBlock Origin
+        "uBlock0@raymondhill.net" = {
+          install_url = "https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi";
+          installation_mode = "force_installed";
+        };
+      };
+    };
+  };
+
   # Environment variables
   home.sessionVariables = {
     EDITOR = "nvim";
-    BROWSER = "firefox";
+    BROWSER = "zen";
     TERMINAL = "ghostty";
   };
 }
-
