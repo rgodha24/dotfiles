@@ -167,6 +167,9 @@
   # Hyprpaper wallpaper daemon
   services.hyprpaper.enable = true;
   home.file.".config/hypr/hyprpaper.conf".source = ./hyprpaper.conf;
+  
+  # Background image
+  home.file."Pictures/background.jpg".source = ./background.jpg;
 
   # Zen Browser configuration
   programs.zen-browser = {
