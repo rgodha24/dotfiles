@@ -5,11 +5,18 @@
       url = "github:nix-community/home-manager/release-25.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
   };
 
-  outputs = { nixpkgs, home-manager, ... }: {
+  outputs = {
+    nixpkgs,
+    home-manager,
+    determinate,
+    ...
+  }: {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
       modules = [
+        determinate.nixosModules.default
         ./configuration.nix
         home-manager.nixosModules.home-manager
         {
@@ -18,7 +25,7 @@
             useGlobalPkgs = true;
             useUserPackages = true;
             users.rgodha = {
-              imports = [ ./home.nix ];
+              imports = [./home.nix];
               home.stateVersion = "25.05";
             };
           };
@@ -27,3 +34,4 @@
     };
   };
 }
+
