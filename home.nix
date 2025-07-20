@@ -1,6 +1,8 @@
-{ config, pkgs, ... }:
-
 {
+  config,
+  pkgs,
+  ...
+}: {
   home.username = "rgodha";
   home.homeDirectory = "/home/rgodha";
   home.stateVersion = "25.05";
@@ -22,7 +24,7 @@
     zoxide
     eza
     lazygit
-    
+
     # Development tools
     git
     neovim
@@ -32,19 +34,19 @@
     gopls
     rustup
     cargo-lambda
-    
+
     # System utilities
     wl-clipboard
     grim
     slurp
     swappy
-    
+
     # Hyprland ecosystem
     waybar
     wofi
     dunst
     hyprpaper
-    
+
     # General tools from old flake
     ripgrep
     bat
@@ -60,10 +62,10 @@
     unzip
     btop
     fd
-    
+
     # Nix tools
     cachix
-    
+
     # Document tools
     typst
     typstyle
@@ -72,17 +74,17 @@
     just
     delta
     aoc-cli
-    
+
     # Pulumi tools
     pulumictl
     pulumiPackages.pulumi-nodejs
     pulumiPackages.pulumi-python
     pulumiPackages.pulumi-go
-    
+
     # Editors
     vscode
     code-cursor
-    
+
     # Formatters and LSPs
     prettierd
     stylua
@@ -92,23 +94,23 @@
     tinymist
     luajitPackages.tiktoken_core
     lynx
-    
+
     # Language tools
     zulu17
     jdt-language-server
     typescript
     zig_0_12
     postgresql_17_jit
-    
+
     # JS tooling
     corepack
     bun
-    
+
     # Python tools
     uv
     ruff
     python314
-    
+
     # Linux-specific tools
     xdg-utils
     graphviz
@@ -137,12 +139,12 @@
       set -x GPG_TTY "$(tty)"
       set -x fish_greeting ""
       set -x EDITOR "$(which nvim)"
-      
+
       # Initialize tools
       starship init fish | source
       zoxide init fish | source
       fnm env --use-on-cd --shell fish | source
-      
+
       # Starship transient prompt
       function starship_transient_prompt_func
         starship module character
@@ -191,13 +193,13 @@
         [](bg:#1A1B26 fg:#4D5267)\
         \n$character
       '';
-      
+
       command_timeout = 5000;
-      
+
       fill = {
         symbol = " ";
       };
-      
+
       directory = {
         style = "fg:#e3e5e5 bg:#769ff0";
         format = "[ $path ]($style)";
@@ -210,42 +212,42 @@
           "Developer" = " ";
         };
       };
-      
+
       git_branch = {
         symbol = "";
         style = "bg:#394260";
         format = "[[ $symbol $branch ](fg:#769ff0 bg:#394260)]($style)";
       };
-      
+
       git_status = {
         style = "bg:#394260";
         format = "[[($all_status$ahead_behind )](fg:#769ff0 bg:#394260)]($style)";
       };
-      
+
       nodejs = {
         symbol = "";
         style = "bg:#212736";
         format = "[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)";
       };
-      
+
       rust = {
         symbol = "";
         style = "bg:#212736";
         format = "[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)";
       };
-      
+
       golang = {
         symbol = "";
         style = "bg:#212736";
         format = "[[ $symbol ($version) ](fg:#769ff0 bg:#212736)]($style)";
       };
-      
+
       nix_shell = {
         disabled = false;
         symbol = "󱄅";
         format = "[[ $symbol ($name) ](fg:#769ff0 bg:#212736)]($style)";
       };
-      
+
       time = {
         disabled = false;
         time_format = "%X";
@@ -267,7 +269,7 @@
     window-padding-y = 0
     quit-after-last-window-closed = true
     cursor-style = bar
-    
+
     mouse-shift-capture = never
     auto-update = download
     keybind = shift+enter=text:\n
@@ -285,7 +287,7 @@
     settings = {
       # Monitor configuration
       monitor = ",preferred,auto,auto";
-      
+
       # Input configuration
       input = {
         kb_layout = "us";
@@ -296,7 +298,7 @@
         };
         sensitivity = 0;
       };
-      
+
       # General settings
       general = {
         gaps_in = 5;
@@ -307,7 +309,7 @@
         layout = "dwindle";
         allow_tearing = false;
       };
-      
+
       # Decoration
       decoration = {
         rounding = 8;
@@ -322,7 +324,7 @@
         shadow_render_power = 3;
         "col.shadow" = "rgba(1a1a1aee)";
       };
-      
+
       # Animations
       animations = {
         enabled = true;
@@ -336,37 +338,36 @@
           "workspaces, 1, 6, default"
         ];
       };
-      
+
       # Layout
       dwindle = {
         pseudotile = true;
         preserve_split = true;
       };
-      
+
       # Window rules
       windowrulev2 = [
         "suppressevent maximize, class:.*"
         "float,class:^(ghostty)$,title:^(floating)$"
       ];
-      
+
       # Key bindings
       "$mod" = "SUPER";
       bind = [
         "$mod, Return, exec, ghostty"
         "$mod, Q, killactive"
         "$mod, M, exit"
-        "$mod, E, exec, thunar"
         "$mod, V, togglefloating"
         "$mod, R, exec, wofi --show drun"
         "$mod, P, pseudo"
         "$mod, J, togglesplit"
-        
+
         # Move focus
         "$mod, left, movefocus, l"
         "$mod, right, movefocus, r"
         "$mod, up, movefocus, u"
         "$mod, down, movefocus, d"
-        
+
         # Switch workspaces
         "$mod, 1, workspace, 1"
         "$mod, 2, workspace, 2"
@@ -378,7 +379,7 @@
         "$mod, 8, workspace, 8"
         "$mod, 9, workspace, 9"
         "$mod, 0, workspace, 10"
-        
+
         # Move active window to workspace
         "$mod SHIFT, 1, movetoworkspace, 1"
         "$mod SHIFT, 2, movetoworkspace, 2"
@@ -390,17 +391,17 @@
         "$mod SHIFT, 8, movetoworkspace, 8"
         "$mod SHIFT, 9, movetoworkspace, 9"
         "$mod SHIFT, 0, movetoworkspace, 10"
-        
+
         # Screenshot
         ", Print, exec, grim -g \"$(slurp)\" - | swappy -f -"
       ];
-      
+
       # Mouse bindings
       bindm = [
         "$mod, mouse:272, movewindow"
         "$mod, mouse:273, resizewindow"
       ];
-      
+
       # Startup
       exec-once = [
         "waybar"
@@ -419,11 +420,11 @@
         position = "top";
         height = 30;
         spacing = 4;
-        
-        modules-left = [ "hyprland/workspaces" "hyprland/mode" ];
-        modules-center = [ "hyprland/window" ];
-        modules-right = [ "network" "battery" "clock" "tray" ];
-        
+
+        modules-left = ["hyprland/workspaces" "hyprland/mode"];
+        modules-center = ["hyprland/window"];
+        modules-right = ["network" "battery" "clock" "tray"];
+
         "hyprland/workspaces" = {
           disable-scroll = true;
           all-outputs = true;
@@ -439,17 +440,17 @@
             default = "";
           };
         };
-        
+
         "hyprland/window" = {
           format = "{}";
           max-length = 50;
         };
-        
+
         clock = {
           tooltip-format = "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>";
           format-alt = "{:%Y-%m-%d}";
         };
-        
+
         battery = {
           states = {
             warning = 30;
@@ -459,9 +460,9 @@
           format-charging = "{capacity}% ";
           format-plugged = "{capacity}% ";
           format-alt = "{time} {icon}";
-          format-icons = [ "" "" "" "" "" ];
+          format-icons = ["" "" "" "" ""];
         };
-        
+
         network = {
           format-wifi = "{essid} ({signalStrength}%) ";
           format-ethernet = "{ipaddr}/{cidr} ";
@@ -472,7 +473,7 @@
         };
       };
     };
-    
+
     style = ''
       * {
         border: none;
@@ -481,34 +482,34 @@
         font-size: 13px;
         min-height: 0;
       }
-      
+
       window#waybar {
         background-color: rgba(26, 27, 38, 0.9);
         color: #c0caf5;
         transition-property: background-color;
         transition-duration: .5s;
       }
-      
+
       #workspaces button {
         padding: 0 5px;
         background-color: transparent;
         color: #c0caf5;
         border-bottom: 3px solid transparent;
       }
-      
+
       #workspaces button:hover {
         background: rgba(0, 0, 0, 0.2);
       }
-      
+
       #workspaces button.focused {
         background-color: #7aa2f7;
         border-bottom: 3px solid #7aa2f7;
       }
-      
+
       #workspaces button.urgent {
         background-color: #f7768e;
       }
-      
+
       #clock,
       #battery,
       #network,
@@ -532,7 +533,7 @@
         frame_color = "#7aa2f7";
         font = "IntoneMono Nerd Font Mono 10";
       };
-      
+
       urgency_normal = {
         background = "#1a1b26";
         foreground = "#c0caf5";
@@ -548,11 +549,11 @@
       ipc = "on";
       splash = false;
       splash_offset = 2.0;
-      
+
       preload = [
         "~/Pictures/wallpaper.jpg"
       ];
-      
+
       wallpaper = [
         ",~/Pictures/wallpaper.jpg"
       ];
@@ -566,3 +567,4 @@
     TERMINAL = "ghostty";
   };
 }
+

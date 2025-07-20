@@ -74,7 +74,6 @@
     wget
     curl
     firefox
-    thunar
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
