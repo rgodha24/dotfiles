@@ -13,7 +13,10 @@
         ./configuration.nix
         home-manager.nixosModules.home-manager
         {
+          nixpkgs.config.allowUnfree = true;
           home-manager = {
+            useGlobalPkgs = true;
+            useUserPackages = true;
             users.rgodha = {
               imports = [ ./home.nix ];
               home.stateVersion = "25.05";
