@@ -1,120 +1,50 @@
 {
+  description = "rgodha NixOS";
+
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/release-25.05";
-    pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-23.11";
+    nixpkgs-unstable.url = "nixpkgs/nixos-unstable";
+    home-manager.url = "github:nix-community/home-manager/release-23.11";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
+
+    firefox-addons = {
+      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
+
   outputs = {
     self,
     nixpkgs,
-    pkgsunstable,
-  }: let
-    supportedSystems = ["x86_64-linux" "aarch64-darwin"];
-    forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+    nixpkgs-unstable,
+    home-manager,
+    lanzaboote,
+    ...
+  } @ inputs: let
+    lib = nixpkgs.lib;
+    system = "x86_64-linux";
+    pkgs = nixpkgs.legacyPackages.${system};
+    pkgs-unstable = nixpkgs-unstable.legacyPackages.${system};
   in {
-    packages = forAllSystems (
-      system: let
-        pkgs = import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
+    nixosConfigurations.nixos-personal = lib.nixosSystem {
+      inherit system;
+      modules = [
+        ./system/configuration.nix
+      ];
+      specialArgs = {
+        inherit pkgs-unstable;
+      };
+    };
+
+    homeConfigurations = {
+      rgodha = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        modules = [./home];
+        extraSpecialArgs = {
+          inherit pkgs-unstable;
+          inherit inputs;
         };
-        unstable = import pkgsunstable {
-          inherit system;
-          config.allowUnfree = true;
-        };
-
-        macPackages =
-          if system == "aarch64-darwin"
-          then
-            with pkgs; [
-              pinentry_mac
-            ]
-          else [];
-
-        linuxPackages =
-          if system == "x86_64-linux"
-          then with pkgs; [xdg-utils graphviz k9s]
-          else [];
-      in {
-        default = pkgs.buildEnv {
-          name = "home-packages";
-          paths = with pkgs;
-            [
-              # general tools
-              ripgrep
-              eza
-              lazygit
-              gh
-              bat
-              zoxide
-              jq
-              gnupg
-              fzf
-              ffmpeg-full
-              yt-dlp
-              gimp
-              gnuplot
-              gimp
-              htop
-              unzip
-              btop
-
-              cachix
-              typst
-              typstyle
-              typst-live
-              taplo
-              just
-              delta
-              aoc-cli
-
-              # pulumi stuff
-              pulumictl
-              pulumiPackages.pulumi-nodejs
-              pulumiPackages.pulumi-python
-              pulumiPackages.pulumi-go
-
-              # terminal + editing
-              starship
-              fish
-              unstable.neovim
-              unstable.vscode
-              unstable.code-cursor
-
-              # formatters + lsps + editor plugins
-              unstable.prettierd
-              stylua
-              alejandra # for nix
-              unstable.tailwindcss-language-server
-              pyright
-              unstable.tinymist
-              luajitPackages.tiktoken_core
-              lynx
-
-              # language tools
-              zulu17
-              jdt-language-server
-              go
-              gopls
-              typescript
-              nodejs_20
-              rustup
-              cargo-lambda
-              zig_0_12
-              postgresql_17_jit
-
-              # js tooling
-              corepack
-              unstable.bun
-              fnm
-
-              # python
-              unstable.uv
-              ruff
-              python314
-            ]
-            ++ macPackages ++ linuxPackages;
-        };
-      }
-    );
+      };
+    };
   };
 }
