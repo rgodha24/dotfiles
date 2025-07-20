@@ -28,7 +28,10 @@
             useUserPackages = true;
             backupFileExtension = "backup";
             users.rgodha = {
-              imports = [./home.nix];
+              imports = [
+                ./home.nix
+                zen-browser.homeModules.twilight
+              ];
               home.stateVersion = "25.05";
             };
             extraSpecialArgs = { inherit zen-browser; system = "x86_64-linux"; };

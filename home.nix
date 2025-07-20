@@ -68,9 +68,6 @@
     # Nix tools
     cachix
 
-    # Browser
-    zen-browser.packages."${system}".twilight
-
     # Document tools
     typst
     typstyle
@@ -86,9 +83,11 @@
     pulumiPackages.pulumi-python
     pulumiPackages.pulumi-go
 
-    # Editors
+    # guis
     vscode
     code-cursor
+    beeper
+    zen-browser.packages."${system}".twilight
 
     # Formatters and LSPs
     prettierd
@@ -107,19 +106,14 @@
     zig_0_12
     postgresql_17_jit
 
-    # JS tooling
     corepack
     bun
 
-    # Python tools
     uv
     ruff
     python314
 
-    # Linux-specific tools
     xdg-utils
-    graphviz
-    k9s
   ];
 
   # Git configuration
@@ -167,7 +161,7 @@
   # Hyprpaper wallpaper daemon
   services.hyprpaper.enable = true;
   home.file.".config/hypr/hyprpaper.conf".source = ./hyprpaper.conf;
-  
+
   # Background image
   home.file."Pictures/background.jpg".source = ./background.jpg;
 
