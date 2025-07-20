@@ -125,13 +125,15 @@
   };
 
   # Fish shell configuration
-  programs.fish.enable = true;
+  programs.fish = {
+    enable = true;
+    interactiveShellInit = builtins.readFile ./config.fish;
+  };
 
   # Starship prompt configuration
   programs.starship.enable = true;
 
   # Config files
-  home.file.".config/fish/config.fish".source = ./config.fish;
   home.file.".config/starship.toml".source = ./starship.toml;
   home.file.".config/ghostty/config".source = ./ghostty.config;
 
@@ -142,8 +144,10 @@
   };
 
   # Hyprland configuration
-  wayland.windowManager.hyprland.enable = true;
-  home.file.".config/hypr/hyprland.conf".source = ./hyprland.conf;
+  wayland.windowManager.hyprland = {
+    enable = true;
+    extraConfig = builtins.readFile ./hyprland.conf;
+  };
 
   # Waybar configuration
   programs.waybar.enable = true;
@@ -151,8 +155,10 @@
   home.file.".config/waybar/style.css".source = ./waybar.styles.css;
 
   # Dunst notification daemon
-  services.dunst.enable = true;
-  home.file.".config/dunst/dunstrc".source = ./dunstrc;
+  services.dunst = {
+    enable = true;
+    configFile = ./dunstrc;
+  };
 
   # Hyprpaper wallpaper daemon
   services.hyprpaper.enable = true;
