@@ -1,11 +1,10 @@
-{ pkgs, ... }:
-{
+{pkgs, ...}: {
   gtk = {
     enable = true;
 
     cursorTheme = {
-        name = "Catppuccin-Macchiato-Blue";
-        package = pkgs.catppuccin-cursors.macchiatoBlue;
+      name = "Catppuccin-Macchiato-Blue";
+      package = pkgs.catppuccin-cursors.macchiatoBlue;
     };
 
     theme = {
@@ -23,16 +22,15 @@
     };
 
     gtk3.extraConfig = {
-        Settings = ''
-            gtk-application-prefer-dark-theme = 1;
-        '';
+      Settings = ''
+        gtk-application-prefer-dark-theme = 1;
+      '';
     };
 
     gtk4.extraConfig = {
-        Settings = ''
-            gtk-application-prefer-dark-theme = 1;
-            '';
+      Settings = ''
+        gtk-application-prefer-dark-theme = 1;
+      '';
     };
-
   };
 }

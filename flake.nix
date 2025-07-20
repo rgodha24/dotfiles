@@ -18,7 +18,6 @@
     nixpkgs,
     nixpkgs-unstable,
     home-manager,
-    lanzaboote,
     ...
   } @ inputs: let
     lib = nixpkgs.lib;

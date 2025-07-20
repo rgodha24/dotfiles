@@ -1,5 +1,3 @@
-{ ... }:
-
-{
-    time.timeZone = "Asia/Tbilisi";
+{...}: {
+  time.timeZone = "Asia/Tbilisi";
 }
