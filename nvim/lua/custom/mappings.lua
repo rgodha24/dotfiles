@@ -45,18 +45,6 @@ if vim.fn.has "mac" == 1 then
       ["*"] = { "pbpaste" },
     },
   }
-else
-  vim.g.clipboard = {
-    name = "WslClipboard",
-    copy = {
-      ["+"] = { "sh", "-c", "iconv -f utf8 -t utf16le | clip.exe" },
-      ["*"] = { "sh", "-c", "iconv -f utf8 -t utf16le | clip.exe" },
-    },
-    paste = {
-      ["+"] = { "powershell.exe", "-c", '[Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))' },
-      ["*"] = { "powershell.exe", "-c", '[Console]::Out.Write($(Get-Clipboard -Raw).tostring().replace("`r", ""))' },
-    },
-  }
 end
 
 return M

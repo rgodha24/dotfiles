@@ -1,12 +1,12 @@
-# prefer things in nix-profile over default macos installs
-set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" 
-
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
 zoxide init fish | source
 if type -q cryptenv
     cryptenv init fish | source
 end
+
+# prefer things in nix-profile over default macos installs
+set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" 
 
 # starship transient prompt https://starship.rs/advanced-config/#transientprompt-and-transientrightprompt-in-fish
 function starship_transient_prompt_func
@@ -25,11 +25,13 @@ alias lg="lazygit"
 alias config="nvim ~/dotfiles/flake.nix && nixup"
 alias where="which"
 alias n="nvim ."
-alias t="exa -T --git-ignore"
+alias t="eza -T --git-ignore"
 
 function gc 
   echo "pruning nix store"
   nix store gc
+  echo "cleaning up home-manager generations"
+  home-manager expire-generations "-7 days"
   echo "pruning pnpm store"
   pnpm store prune
   echo "pruning bun cache"
