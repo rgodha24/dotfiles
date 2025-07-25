@@ -93,6 +93,7 @@ in {
     unstable.vscode
     unstable.code-cursor
     beeper
+    geekbench
 
     # Formatters and LSPs
     prettierd
