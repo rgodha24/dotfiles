@@ -43,6 +43,17 @@ in {
     gopls
     rustup
     cargo-lambda
+    (pkgs.rustPlatform.buildRustPackage {
+      pname = "cryptenv";
+      version = "0.3.0";
+      src = pkgs.fetchFromGitHub {
+        owner = "rgodha24";
+        repo = "cryptenv";
+        rev = "a4e0f6cc30ec8df50524e6a8ec4366fa7abf3a10";
+        sha256 = "sha256-XHogXpnbbzjqcvA/qCp9JaOjE1Dm6FHac+/m4NfVxPA=";
+      };
+      cargoHash = "sha256-dVqsumAa1HxGgBYhI5/NaMJoLJftWx1SIU6rNQGykr8=";
+    })
 
     # System utilities
     wl-clipboard
