@@ -140,13 +140,14 @@ in {
     userName = "Rohan Godha";
     userEmail = "git@rohangodha.com";
     signing = {
-      key = "~/.ssh/id_ed25519.pub";
+      key = "~/.ssh/id_ed25519";
       signByDefault = true;
     };
     extraConfig = {
       init.defaultBranch = "main"; # im too woke 💔🥀
       gpg.format = "ssh";
       gpg.ssh.allowedSignersFile = "~/.ssh/allowed_signers";
+      user.signingkey = "~/.ssh/id_ed25519";
     };
   };
 

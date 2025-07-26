@@ -33,18 +33,4 @@ M.general = {
   },
 }
 
-if vim.fn.has "mac" == 1 then
-  vim.g.clipboard = {
-    name = "clipboard",
-    copy = {
-      ["+"] = { "pbcopy" },
-      ["*"] = { "pbcopy" },
-    },
-    paste = {
-      ["+"] = { "pbpaste" },
-      ["*"] = { "pbpaste" },
-    },
-  }
-end
-
 return M
