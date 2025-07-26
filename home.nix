@@ -191,7 +191,7 @@ in {
   home.file."Pictures/background.jpg".source = ./background.jpg;
 
   # SSH allowed signers for git commit verification
-  home.file.".ssh/allowed_signers".text = "git@rohangodha.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC9IVeR9uVF+2Iop98kZ0zzcHxzijwlLluqDBPVmyPJA rgodha@nixos";
+  home.file.".ssh/allowed_signers".text = "git@rohangodha.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBGSYGWEg9n6XlaYavB1MyYk+H6IEBPec5DYLGWz6lPm rgodha@nixos";
 
   # Zen Browser configuration
   programs.zen-browser = {

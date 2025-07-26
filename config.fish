@@ -1,9 +1,7 @@
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
 zoxide init fish | source
-if type -q cryptenv
-    cryptenv init fish | source
-end
+cryptenv init fish | source
 
 # prefer things in nix-profile over default macos installs
 set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" 
