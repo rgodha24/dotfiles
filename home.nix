@@ -32,6 +32,7 @@ in {
     zoxide
     eza
     lazygit
+    unstable.opencode
 
     # Development tools
     git
@@ -132,7 +133,7 @@ in {
       signByDefault = true;
     };
     extraConfig = {
-      init.defaultBranch = "main";
+      init.defaultBranch = "main"; # im too woke 💔🥀
       gpg.format = "ssh";
       gpg.ssh.allowedSignersFile = "~/.ssh/allowed_signers";
     };

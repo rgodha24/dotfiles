@@ -18,6 +18,14 @@
   # Use latest kernel.
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
+  # mount the windows fs
+  boot.supportedFilesystems = ["ntfs"];
+  fileSystems."/mnt/windows" = {
+    device = "/dev/nvme0n1p3";
+    fsType = "ntfs-3g";
+    options = ["ro" "uid=1000" "gid=1000" "umask=0022"];
+  };
+
   # nix flakes
   nix.settings.experimental-features = ["nix-command" "flakes"];
 
@@ -80,6 +88,11 @@
   programs.hyprland.enable = true;
   programs.fish.enable = true;
   programs.steam.enable = true;
+
+  # Display manager for graphical login
+  services.displayManager.sddm.enable = true;
+  services.displayManager.sddm.wayland.enable = true;
+  services.displayManager.defaultSession = "hyprland";
 
   # Enable sound with pipewire.
   services.pulseaudio.enable = false;
