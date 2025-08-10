@@ -117,21 +117,25 @@ in {
     luajitPackages.tiktoken_core
     lynx
 
-    # Language tools
     zulu17
     jdt-language-server
     typescript
     zig_0_12
     postgresql_17_jit
+    typescript-language-server
+    svelte-language-server
+    clang-tools
+    astro-language-server
 
     corepack
     unstable.bun
 
-    uv
-    ruff
-    python314
+    unstable.uv
+    unstable.ruff
+    python313Full
 
     xdg-utils
+    ncspot
   ];
 
   # Git configuration
@@ -159,6 +163,7 @@ in {
   programs.starship.enable = true;
   home.file.".config/starship.toml".source = ./starship.toml;
   home.file.".config/ghostty/config".source = ./ghostty.config;
+  home.file.".config/cryptenv.toml".source = ./cryptenv.toml;
 
   # Neovim configuration
   home.file.".config/nvim" = {

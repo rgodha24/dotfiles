@@ -15,8 +15,7 @@
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # Use latest kernel.
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelPackages = pkgs.linuxPackages;
 
   # mount the windows fs
   boot.supportedFilesystems = ["ntfs"];
@@ -83,6 +82,7 @@
     curl
     gcc
     openssl
+    stdenv.cc.cc.lib
   ];
 
   programs.hyprland.enable = true;
@@ -110,6 +110,15 @@
   services.blueman.enable = true;
   security.polkit.enable = true;
   programs.dconf.enable = true;
+
+  hardware.graphics.enable = true; #opengl
+  services.xserver.videoDrivers = ["nvidia"];
+  hardware.nvidia = {
+    modesetting.enable = true;
+    open = true; # recommended for 5060ti
+    nvidiaSettings = true;
+    package = config.boot.kernelPackages.nvidiaPackages.latest;
+  };
 
   # XDG portal for screen sharing and file dialogs
   xdg.portal = {
