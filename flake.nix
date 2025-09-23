@@ -17,7 +17,13 @@
     determinate,
     zen-browser,
     ...
-  }: {
+  }: let
+    unstable = import pkgsunstable {
+      inherit system;
+      config.allowUnfree = true;
+    };
+    system = "x86_64-linux";
+  in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
       modules = [
         determinate.nixosModules.default
@@ -38,10 +44,13 @@
             };
             extraSpecialArgs = {
               inherit zen-browser;
-              inherit pkgsunstable;
-              system = "x86_64-linux";
+              inherit unstable;
+              inherit system;
             };
           };
+
+          programs.nix-ld.enable = true;
+          programs.nix-ld.package = unstable.nix-ld;
         }
       ];
     };

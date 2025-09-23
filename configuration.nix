@@ -39,7 +39,7 @@
   networking.networkmanager.enable = true;
 
   # Set your time zone.
-  time.timeZone = "America/Denver";
+  time.timeZone = "America/New_York";
 
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
@@ -83,11 +83,28 @@
     gcc
     openssl
     stdenv.cc.cc.lib
+    adwaita-qt
+    adwaita-qt6
   ];
 
   programs.hyprland.enable = true;
   programs.fish.enable = true;
   programs.steam.enable = true;
+
+  # Global dark theme
+  environment.variables = {
+    GTK_THEME = "Adwaita:dark";
+    QT_STYLE_OVERRIDE = "adwaita-dark";
+  };
+
+  qt = {
+    enable = true;
+    platformTheme = "gnome";
+    style = "adwaita-dark";
+  };
+
+  services.dbus.packages = with pkgs; [ dconf ];
+  programs.dconf.enable = true;
 
   # Display manager for graphical login
   services.displayManager.sddm.enable = true;
@@ -109,7 +126,6 @@
   hardware.bluetooth.enable = true;
   services.blueman.enable = true;
   security.polkit.enable = true;
-  programs.dconf.enable = true;
 
   hardware.graphics.enable = true; #opengl
   services.xserver.videoDrivers = ["nvidia"];

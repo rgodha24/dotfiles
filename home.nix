@@ -1,16 +1,11 @@
 {
   config,
   pkgs,
-  pkgsunstable,
+  unstable,
   zen-browser,
   system,
   ...
-}: let
-  unstable = import pkgsunstable {
-    inherit system;
-    config.allowUnfree = true;
-  };
-in {
+}: {
   home.username = "rgodha";
   home.homeDirectory = "/home/rgodha";
   home.stateVersion = "25.05";
@@ -43,7 +38,7 @@ in {
     gopls
     rustup
     cargo-lambda
-    (pkgs.rustPlatform.buildRustPackage {
+    (unstable.rustPlatform.buildRustPackage {
       pname = "cryptenv";
       version = "0.3.0";
       src = pkgs.fetchFromGitHub {
@@ -53,6 +48,11 @@ in {
         sha256 = "sha256-XHogXpnbbzjqcvA/qCp9JaOjE1Dm6FHac+/m4NfVxPA=";
       };
       cargoHash = "sha256-dVqsumAa1HxGgBYhI5/NaMJoLJftWx1SIU6rNQGykr8=";
+
+      # Debugging aids
+      cargoBuildFlags = ["-vv"];
+      CARGO_BUILD_JOBS = "1";
+      RUST_BACKTRACE = "full";
     })
 
     # System utilities
@@ -106,6 +106,8 @@ in {
     unstable.code-cursor
     beeper
     geekbench
+    discord
+    davinci-resolve
 
     # Formatters and LSPs
     prettierd
