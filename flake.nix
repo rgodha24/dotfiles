@@ -37,8 +37,8 @@
             backupFileExtension = "backup";
             users.rgodha = {
               imports = [
+                zen-browser.homeModules.beta
                 ./home.nix
-                zen-browser.homeModules.twilight
               ];
               home.stateVersion = "25.05";
             };
