@@ -66,7 +66,7 @@
   users.users.rgodha = {
     isNormalUser = true;
     description = "Rohan Godha";
-    extraGroups = ["networkmanager" "wheel"];
+    extraGroups = ["networkmanager" "wheel" "docker"];
     packages = with pkgs; [git];
     shell = pkgs.fish;
   };
@@ -90,6 +90,12 @@
   programs.hyprland.enable = true;
   programs.fish.enable = true;
   programs.steam.enable = true;
+
+  # Enable Docker
+  virtualisation.docker = {
+    enable = true;
+    enableOnBoot = true;
+  };
 
   # Global dark theme
   environment.variables = {
