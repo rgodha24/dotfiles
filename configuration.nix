@@ -27,6 +27,8 @@
 
   # nix flakes
   nix.settings.experimental-features = ["nix-command" "flakes"];
+  # cachix stuff
+  nix.settings.trusted-users = ["root" "rgodha"];
 
   networking.hostName = "nixos"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
@@ -109,7 +111,7 @@
     style = "adwaita-dark";
   };
 
-  services.dbus.packages = with pkgs; [ dconf ];
+  services.dbus.packages = with pkgs; [dconf];
   programs.dconf.enable = true;
 
   # Display manager for graphical login

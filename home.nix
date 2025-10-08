@@ -42,6 +42,7 @@ in {
     eza
     lazygit
     unstable.opencode
+    unstable.codex
 
     # Development tools
     git
