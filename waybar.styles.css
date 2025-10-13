@@ -17,7 +17,7 @@ window#waybar {
 
 /* Workspace styling */
 #workspaces {
-    margin: 0 8px;
+    margin: 0 4px;
     border-radius: 8px;
     background: rgba(65, 72, 104, 0.1);
     padding: 2px;
@@ -60,9 +60,9 @@ window#waybar {
 
 /* Window title styling */
 #window {
-    margin: 0 16px;
-    padding: 4px 12px;
-    background: rgba(65, 72, 104, 0.15);
+    margin: 0;
+    padding: 4px 0px;
+    background: transparent;
     border-radius: 8px;
     color: #9ece6a;
     font-weight: 500;
@@ -83,7 +83,7 @@ window#waybar {
 }
 
 .modules-right {
-    margin-right: 8px;
+    margin-right: 4px;
 }
 
 /* Individual modules */

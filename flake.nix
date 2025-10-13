@@ -8,6 +8,10 @@
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
     zen-browser.url = "github:0xc000022070/zen-browser-flake";
     pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
@@ -16,13 +20,15 @@
     home-manager,
     determinate,
     zen-browser,
+    fenix,
     ...
   }: let
+    system = "x86_64-linux";
     unstable = import pkgsunstable {
       inherit system;
       config.allowUnfree = true;
     };
-    system = "x86_64-linux";
+    fenixPkgs = fenix.packages.${system};
   in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
       modules = [
@@ -46,6 +52,7 @@
               inherit zen-browser;
               inherit unstable;
               inherit system;
+              inherit fenixPkgs;
             };
           };
 

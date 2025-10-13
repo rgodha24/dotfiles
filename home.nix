@@ -4,6 +4,7 @@
   unstable,
   zen-browser,
   system,
+  fenixPkgs,
   ...
 }: let
   # Wrap Zen to disable profile-per-install
@@ -29,131 +30,130 @@ in {
 
   # Fonts
   fonts.fontconfig.enable = true;
-  home.packages = with pkgs; [
-    # Fonts
-    intel-one-mono
-    nerd-fonts.intone-mono
+  home.packages =
+    (with pkgs; [
+      # Fonts
+      intel-one-mono
+      nerd-fonts.intone-mono
 
-    # Terminal and shell tools
-    ghostty
-    fish
-    starship
-    zoxide
-    eza
-    lazygit
-    unstable.opencode
-    unstable.codex
+      # Terminal and shell tools
+      ghostty
+      fish
+      starship
+      zoxide
+      eza
+      lazygit
+      # unstable.opencode
+      unstable.codex
+      zellij
 
-    # Development tools
-    git
-    unstable.neovim
-    fnm
-    nodejs_20
-    go
-    gopls
-    rustup
-    cargo-lambda
-    (unstable.rustPlatform.buildRustPackage {
-      pname = "cryptenv";
-      version = "0.3.0";
-      src = pkgs.fetchFromGitHub {
-        owner = "rgodha24";
-        repo = "cryptenv";
-        rev = "a4e0f6cc30ec8df50524e6a8ec4366fa7abf3a10";
-        sha256 = "sha256-XHogXpnbbzjqcvA/qCp9JaOjE1Dm6FHac+/m4NfVxPA=";
-      };
-      cargoHash = "sha256-dVqsumAa1HxGgBYhI5/NaMJoLJftWx1SIU6rNQGykr8=";
+      # Development tools
+      git
+      unstable.neovim
+      fnm
+      nodejs_20
+      go
+      gopls
+      cargo-lambda
+      (unstable.rustPlatform.buildRustPackage {
+        pname = "cryptenv";
+        version = "0.3.0";
+        src = pkgs.fetchFromGitHub {
+          owner = "rgodha24";
+          repo = "cryptenv";
+          rev = "a4e0f6cc30ec8df50524e6a8ec4366fa7abf3a10";
+          sha256 = "sha256-XHogXpnbbzjqcvA/qCp9JaOjE1Dm6FHac+/m4NfVxPA=";
+        };
+        cargoHash = "sha256-dVqsumAa1HxGgBYhI5/NaMJoLJftWx1SIU6rNQGykr8=";
+      })
 
-      # Debugging aids
-      cargoBuildFlags = ["-vv"];
-      CARGO_BUILD_JOBS = "1";
-      RUST_BACKTRACE = "full";
-    })
+      # System utilities
+      wl-clipboard
+      grim
+      slurp
+      swappy
 
-    # System utilities
-    wl-clipboard
-    grim
-    slurp
-    swappy
+      # Hyprland ecosystem
+      waybar
+      wofi
+      dunst
+      hyprpaper
 
-    # Hyprland ecosystem
-    waybar
-    wofi
-    dunst
-    hyprpaper
+      # General tools from old flake
+      ripgrep
+      bat
+      gh
+      jq
+      gnupg
+      fzf
+      ffmpeg-full
+      yt-dlp
+      gimp
+      gnuplot
+      htop
+      unzip
+      btop
+      fd
 
-    # General tools from old flake
-    ripgrep
-    bat
-    gh
-    jq
-    gnupg
-    fzf
-    ffmpeg-full
-    yt-dlp
-    gimp
-    gnuplot
-    htop
-    unzip
-    btop
-    fd
+      # Nix tools
+      cachix
 
-    # Nix tools
-    cachix
+      # Document tools
+      typst
+      typstyle
+      typst-live
+      taplo
+      just
+      delta
+      aoc-cli
 
-    # Document tools
-    typst
-    typstyle
-    typst-live
-    taplo
-    just
-    delta
-    aoc-cli
+      # Pulumi tools
+      pulumictl
+      pulumiPackages.pulumi-nodejs
+      pulumiPackages.pulumi-python
+      pulumiPackages.pulumi-go
 
-    # Pulumi tools
-    pulumictl
-    pulumiPackages.pulumi-nodejs
-    pulumiPackages.pulumi-python
-    pulumiPackages.pulumi-go
+      # guis
+      unstable.vscode
+      unstable.code-cursor
+      beeper
+      geekbench
+      discord
+      davinci-resolve
 
-    # guis
-    unstable.vscode
-    unstable.code-cursor
-    beeper
-    geekbench
-    discord
-    davinci-resolve
+      # Formatters and LSPs
+      prettierd
+      stylua
+      alejandra
+      tailwindcss-language-server
+      pyright
+      tinymist
+      luajitPackages.tiktoken_core
+      lynx
 
-    # Formatters and LSPs
-    prettierd
-    stylua
-    alejandra
-    tailwindcss-language-server
-    pyright
-    tinymist
-    luajitPackages.tiktoken_core
-    lynx
+      zulu17
+      jdt-language-server
+      typescript
+      zig_0_12
+      postgresql_17_jit
+      typescript-language-server
+      svelte-language-server
+      clang-tools
+      astro-language-server
 
-    zulu17
-    jdt-language-server
-    typescript
-    zig_0_12
-    postgresql_17_jit
-    typescript-language-server
-    svelte-language-server
-    clang-tools
-    astro-language-server
+      corepack
+      unstable.bun
 
-    corepack
-    unstable.bun
+      unstable.uv
+      unstable.ruff
+      python313Full
 
-    unstable.uv
-    unstable.ruff
-    python313Full
-
-    xdg-utils
-    ncspot
-  ];
+      xdg-utils
+      ncspot
+    ])
+    ++ [
+      fenixPkgs.stable.toolchain
+    ];
 
   # Git configuration
   programs.git = {
