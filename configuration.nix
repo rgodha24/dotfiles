@@ -87,6 +87,11 @@
     stdenv.cc.cc.lib
     adwaita-qt
     adwaita-qt6
+    quartus-prime-lite
+    xorg.xauth
+    xorg.xhost
+    xorg.xclock
+    xorg.xeyes
   ];
 
   programs.hyprland.enable = true;
@@ -98,6 +103,8 @@
     enable = true;
     enableOnBoot = true;
   };
+
+  hardware.nvidia-container-toolkit.enable = true;
 
   # Global dark theme
   environment.variables = {
@@ -129,7 +136,16 @@
     pulse.enable = true;
   };
 
-  services.openssh.enable = true;
+  services.openssh = {
+    enable = true;
+    settings = {
+      PasswordAuthentication = false;
+      X11Forwarding = true;
+      X11UseLocalhost = true;
+    };
+  };
+
+  networking.firewall.allowedTCPPorts = [3000];
 
   hardware.bluetooth.enable = true;
   services.blueman.enable = true;

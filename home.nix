@@ -43,9 +43,10 @@ in {
       zoxide
       eza
       lazygit
-      # unstable.opencode
+      unstable.opencode
       unstable.codex
       zellij
+      xorg.xauth
 
       # Development tools
       git
@@ -93,6 +94,7 @@ in {
       htop
       unzip
       btop
+      nvitop
       fd
 
       # Nix tools
@@ -120,6 +122,7 @@ in {
       geekbench
       discord
       davinci-resolve
+      quartus-prime-lite
 
       # Formatters and LSPs
       prettierd
