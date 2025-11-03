@@ -39,6 +39,37 @@
 
   # Enable networking
   networking.networkmanager.enable = true;
+  networking.interfaces.enp13s0f3u1c2 = {
+    useDHCP = false;
+    ipv4.addresses = [
+      {
+        address = "10.42.0.1";
+        prefixLength = 24;
+      }
+    ];
+  };
+  networking.firewall.trustedInterfaces = ["enp13s0f3u1c2"];
+  networking.nat = {
+    enable = true;
+    externalInterface = "enp9s0";
+    internalInterfaces = ["enp13s0f3u1c2"];
+    enableIPv6 = false;
+  };
+
+  services.dnsmasq = {
+    enable = true;
+    settings = {
+      interface = ["enp13s0f3u1c2"];
+      bind-interfaces = true;
+      listen-address = ["10.42.0.1"];
+      dhcp-range = ["10.42.0.100,10.42.0.200,255.255.255.0,12h"];
+      dhcp-option = [
+        "option:router,10.42.0.1"
+        "option:dns-server,1.1.1.1,8.8.8.8"
+      ];
+      server = ["1.1.1.1" "8.8.8.8"];
+    };
+  };
 
   # Set your time zone.
   time.timeZone = "America/New_York";

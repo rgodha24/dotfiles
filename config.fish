@@ -28,8 +28,6 @@ alias t="eza -T --git-ignore"
 function gc 
   echo "pruning nix store"
   nix store gc
-  echo "cleaning up home-manager generations"
-  home-manager expire-generations "-7 days"
   echo "pruning pnpm store"
   pnpm store prune
   echo "pruning bun cache"

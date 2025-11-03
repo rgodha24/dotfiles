@@ -20,6 +20,85 @@
       inherit (zenPkg) meta;
       override = _: zenWrapped;
     };
+  zellijOsc52 = let
+    inherit
+      (pkgs)
+      lib
+      stdenv
+      fetchFromGitHub
+      mandown
+      installShellFiles
+      patchelf
+      pkg-config
+      curl
+      openssl
+      writableTmpDirAsHomeHook
+      ;
+    rustPlatform = pkgs.makeRustPlatform {
+      cargo = fenixPkgs.stable.cargo;
+      rustc = fenixPkgs.stable.rustc;
+    };
+  in
+    rustPlatform.buildRustPackage (finalAttrs: rec {
+      pname = "zellij";
+      src = fetchFromGitHub {
+        owner = "rgodha24";
+        repo = "zellij";
+        rev = "5fec616f64410e2cdfdf295c6b4f6d5e8eed6fe4";
+        hash = "sha256-94L5QXKP60RJDlgkkb9RHjSocchuxu/LsoQsKl4hxqg=";
+      };
+      version = "osc52-main";
+
+      postPatch = ''
+        substituteInPlace Cargo.toml \
+          --replace-fail ', "vendored_curl"' ""
+      '';
+
+      cargoHash = "sha256-eK26nQYLVlqHkZu6nwWmc/12TLUsq2o47T8SlK8yvcA=";
+
+      env.OPENSSL_NO_VENDOR = 1;
+
+      nativeBuildInputs = [
+        mandown
+        installShellFiles
+        patchelf
+        pkg-config
+        (lib.getDev curl)
+      ];
+
+      buildInputs = [
+        curl
+        openssl
+      ];
+
+      nativeCheckInputs = [
+        writableTmpDirAsHomeHook
+      ];
+
+      doCheck = false;
+      doInstallCheck = false;
+
+      postInstall = ''
+        mandown docs/MANPAGE.md > zellij.1
+        installManPage zellij.1
+      '';
+      postFixup = ''
+        current_rpath=$(patchelf --print-rpath "$out/bin/zellij" || true)
+        extra_rpath="${lib.makeLibraryPath [openssl curl]}"
+        if [ -n "$current_rpath" ]; then
+          patchelf --set-rpath "$current_rpath:$extra_rpath" "$out/bin/zellij"
+        else
+          patchelf --set-rpath "$extra_rpath" "$out/bin/zellij"
+        fi
+      '';
+
+      meta =
+        pkgs.zellij.meta
+        // {
+          description = "Terminal workspace with batteries included (OSC52 build)";
+          changelog = "https://github.com/rgodha24/zellij/tree/osc52-main";
+        };
+    });
 in {
   home.username = "rgodha";
   home.homeDirectory = "/home/rgodha";
@@ -45,7 +124,6 @@ in {
       lazygit
       unstable.opencode
       unstable.codex
-      zellij
       xorg.xauth
 
       # Development tools
@@ -156,6 +234,7 @@ in {
     ])
     ++ [
       fenixPkgs.stable.toolchain
+      zellijOsc52
     ];
 
   # Git configuration
@@ -184,6 +263,7 @@ in {
   home.file.".config/starship.toml".source = ./starship.toml;
   home.file.".config/ghostty/config".source = ./ghostty.config;
   home.file.".config/cryptenv.toml".source = ./cryptenv.toml;
+  home.file.".config/zellij/config.kdl".source = ./zellij.kdl;
 
   # Neovim configuration
   home.file.".config/nvim" = {
@@ -247,5 +327,6 @@ in {
     EDITOR = "nvim";
     BROWSER = "zen";
     TERMINAL = "ghostty";
+    LM_LICENSE_FILE = "/home/rgodha/Downloads/LR-264460_FIXED.dat";
   };
 }
