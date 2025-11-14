@@ -44,8 +44,8 @@
       src = fetchFromGitHub {
         owner = "rgodha24";
         repo = "zellij";
-        rev = "5fec616f64410e2cdfdf295c6b4f6d5e8eed6fe4";
-        hash = "sha256-94L5QXKP60RJDlgkkb9RHjSocchuxu/LsoQsKl4hxqg=";
+        rev = "1c6a7c84858ba7fab6a20e6622c00a4e5c3d17aa";
+        hash = "sha256-JrIHSg5L241E8Aa2wZUzOzlfRU1bcYRtqjx87EBI5tI=";
       };
       version = "osc52-main";
 
@@ -54,7 +54,7 @@
           --replace-fail ', "vendored_curl"' ""
       '';
 
-      cargoHash = "sha256-eK26nQYLVlqHkZu6nwWmc/12TLUsq2o47T8SlK8yvcA=";
+      cargoHash = "sha256-0vzYAIW7xWryqm3bJBpdzeJdPB8Y2ciJ+tMTTzpuK/M=";
 
       env.OPENSSL_NO_VENDOR = 1;
 
