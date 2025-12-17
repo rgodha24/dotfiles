@@ -1,8 +1,6 @@
 local on_attach = require("plugins.configs.lspconfig").on_attach
 local capabilities = require("plugins.configs.lspconfig").capabilities
 
-local lspconfig = require "lspconfig"
-
 -- if you just want default config for the servers then put them in a table
 local servers = {
   "html",
@@ -23,13 +21,14 @@ local servers = {
 }
 
 for _, lsp in ipairs(servers) do
-  lspconfig[lsp].setup {
+  vim.lsp.config(lsp, {
     on_attach = on_attach,
     capabilities = capabilities,
-  }
+  })
+  vim.lsp.enable(lsp)
 end
 
-lspconfig.astro.setup {
+vim.lsp.config("astro", {
   on_attach = on_attach,
   capabilities = capabilities,
   init_options = {
@@ -37,7 +36,6 @@ lspconfig.astro.setup {
       tsdk = vim.fs.normalize "~/.nix-profile/lib/node_modules/typescript/lib",
     },
   },
-}
+})
 
---
--- lspconfig.pyright.setup { blabla}
+vim.lsp.enable("astro")

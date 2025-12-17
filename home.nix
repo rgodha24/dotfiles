@@ -264,6 +264,8 @@ in {
   home.file.".config/ghostty/config".source = ./ghostty.config;
   home.file.".config/cryptenv.toml".source = ./cryptenv.toml;
   home.file.".config/zellij/config.kdl".source = ./zellij.kdl;
+  home.file.".config/opencode/opencode.json".source = ./opencode/opencode.json;
+  home.file.".config/opencode/oh-my-opencode.json".source = ./opencode/oh-my-opencode.json;
 
   # Neovim configuration
   home.file.".config/nvim" = {

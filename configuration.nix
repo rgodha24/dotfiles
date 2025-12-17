@@ -56,11 +56,19 @@
     enableIPv6 = false;
   };
 
+  networking.resolvconf.useLocalResolver = true;
+  services.resolved = {
+    enable = true;
+    dnssec = "false";
+    dnsovertls = "false";
+    fallbackDns = ["1.1.1.1" "8.8.8.8"];
+  };
+
   services.dnsmasq = {
     enable = true;
     settings = {
       interface = ["enp13s0f3u1c2"];
-      bind-interfaces = true;
+      bind-dynamic = true;
       listen-address = ["10.42.0.1"];
       dhcp-range = ["10.42.0.100,10.42.0.200,255.255.255.0,12h"];
       dhcp-option = [
