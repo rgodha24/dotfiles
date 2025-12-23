@@ -24,6 +24,7 @@ alias config="nvim ~/dotfiles/flake.nix && nixup"
 alias where="which"
 alias n="nvim ."
 alias t="eza -T --git-ignore"
+alias reboot-windows='sudo bootctl set-oneshot auto-windows && sudo reboot'
 
 function gc 
   echo "pruning nix store"

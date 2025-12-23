@@ -165,6 +165,8 @@ keybinds clear-defaults=true {
         bind "8" { GoToTab 8; SwitchToMode "normal"; }
         bind "9" { GoToTab 9; SwitchToMode "normal"; }
         bind "Tab" { ToggleTab; }
+        bind "<" { MoveTab "Left"; }
+        bind ">" { MoveTab "Right"; }
     }
     
     session {
