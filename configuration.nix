@@ -137,11 +137,11 @@
     stdenv.cc.cc.lib
     adwaita-qt
     adwaita-qt6
-    quartus-prime-lite
     xorg.xauth
     xorg.xhost
     xorg.xclock
     xorg.xeyes
+    tailscale
   ];
 
   programs.hyprland.enable = true;
@@ -208,6 +208,11 @@
     open = true; # recommended for 5060ti
     nvidiaSettings = true;
     package = config.boot.kernelPackages.nvidiaPackages.latest;
+  };
+
+  services.tailscale = {
+    enable = true;
+    extraUpFlags = ["--accept-dns=false"];
   };
 
   # XDG portal for screen sharing and file dialogs

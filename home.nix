@@ -5,6 +5,7 @@
   zen-browser,
   system,
   fenixPkgs,
+  opencode,
   ...
 }: let
   # Wrap Zen to disable profile-per-install
@@ -122,7 +123,7 @@ in {
       zoxide
       eza
       lazygit
-      unstable.opencode
+      opencode.packages.${system}.default
       unstable.codex
       xorg.xauth
 
@@ -136,14 +137,14 @@ in {
       cargo-lambda
       (unstable.rustPlatform.buildRustPackage {
         pname = "cryptenv";
-        version = "0.3.0";
+        version = "0.4.0";
         src = pkgs.fetchFromGitHub {
           owner = "rgodha24";
           repo = "cryptenv";
-          rev = "a4e0f6cc30ec8df50524e6a8ec4366fa7abf3a10";
-          sha256 = "sha256-XHogXpnbbzjqcvA/qCp9JaOjE1Dm6FHac+/m4NfVxPA=";
+          rev = "c38e548d0e2ca22ff568a996a949a0fedf2c2209";
+          sha256 = "sha256-LAdtxBmrIt+E/qJF80rtBvztTJbOI7+dzkRQHjUlivQ=";
         };
-        cargoHash = "sha256-dVqsumAa1HxGgBYhI5/NaMJoLJftWx1SIU6rNQGykr8=";
+        cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
       })
 
       # System utilities

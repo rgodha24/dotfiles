@@ -12,6 +12,9 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    opencode = {
+      url = "github:rgodha24/opencode";
+    };
   };
 
   outputs = {
@@ -21,6 +24,7 @@
     determinate,
     zen-browser,
     fenix,
+    opencode,
     ...
   }: let
     system = "x86_64-linux";
@@ -53,6 +57,7 @@
               inherit unstable;
               inherit system;
               inherit fenixPkgs;
+              inherit opencode;
             };
           };
 
