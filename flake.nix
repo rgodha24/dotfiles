@@ -27,14 +27,23 @@
     opencode,
     ...
   }: let
-    system = "x86_64-linux";
-    unstable = import pkgsunstable {
-      inherit system;
-      config.allowUnfree = true;
-    };
-    fenixPkgs = fenix.packages.${system};
+    linuxSystem = "x86_64-linux";
+    darwinSystem = "aarch64-darwin";
+    pkgsFor = system:
+      import nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+      };
+    unstableFor = system:
+      import pkgsunstable {
+        inherit system;
+        config.allowUnfree = true;
+      };
+    unstable = unstableFor linuxSystem;
+    fenixPkgs = fenix.packages.${linuxSystem};
   in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+      system = linuxSystem;
       modules = [
         determinate.nixosModules.default
         ./configuration.nix
@@ -50,12 +59,11 @@
                 zen-browser.homeModules.beta
                 ./home.nix
               ];
-              home.stateVersion = "25.05";
             };
             extraSpecialArgs = {
               inherit zen-browser;
               inherit unstable;
-              inherit system;
+              system = linuxSystem;
               inherit fenixPkgs;
               inherit opencode;
             };
@@ -64,6 +72,19 @@
           programs.nix-ld.enable = true;
           programs.nix-ld.package = unstable.nix-ld;
         }
+      ];
+    };
+
+    homeConfigurations.mac = home-manager.lib.homeManagerConfiguration {
+      pkgs = pkgsFor darwinSystem;
+      extraSpecialArgs = {
+        system = darwinSystem;
+        unstable = unstableFor darwinSystem;
+        inherit opencode;
+      };
+      modules = [
+        ./home/common.nix
+        ./home/darwin.nix
       ];
     };
   };

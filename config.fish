@@ -1,10 +1,16 @@
+# prefer things in nix-profile over default installs
+set -l path_extra "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin"
+if test (uname) = "Darwin"
+  set -a path_extra "/Applications/Tailscale.app/Contents/MacOS/"
+end
+set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH $path_extra
+
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
 zoxide init fish | source
-cryptenv init fish | source
-
-# prefer things in nix-profile over default macos installs
-set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" 
+if type -q cryptenv
+  cryptenv init fish | source
+end
 
 # starship transient prompt https://starship.rs/advanced-config/#transientprompt-and-transientrightprompt-in-fish
 function starship_transient_prompt_func
@@ -24,11 +30,17 @@ alias config="nvim ~/dotfiles/flake.nix && nixup"
 alias where="which"
 alias n="nvim ."
 alias t="eza -T --git-ignore"
-alias reboot-windows='sudo bootctl set-oneshot auto-windows && sudo reboot'
+if test (uname) = "Linux"
+  alias reboot-windows='sudo bootctl set-oneshot auto-windows && sudo reboot'
+end
 
 function gc 
   echo "pruning nix store"
   nix store gc
+  if type -q home-manager
+    echo "cleaning up home-manager generations"
+    home-manager expire-generations "-7 days"
+  end
   echo "pruning pnpm store"
   pnpm store prune
   echo "pruning bun cache"
@@ -38,7 +50,13 @@ function gc
 end
 
 function nixup
-  nix profile upgrade dotfiles
+  if test (uname) = "Darwin"
+    home-manager switch --flake ~/dotfiles#mac
+  else if type -q nixos-rebuild
+    sudo nixos-rebuild switch --flake ~/dotfiles#nixos
+  else
+    nix profile upgrade dotfiles
+  end
 end
 
 # because `nix shell` doesn't work well with starship https://github.com/NixOS/nix/issues/6677
