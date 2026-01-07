@@ -68,8 +68,7 @@
       "name": "Claude Opus 4.5 (Failover)",
       "chain": [
         { "provider": "anthropic", "model": "claude-opus-4-5" },
-        { "provider": "github-copilot", "model": "claude-opus-4-5" },
-        { "provider": "anthropic-api", "model": "claude-opus-4-5" }
+        { "provider": "github-copilot", "model": "claude-opus-4.5" }
       ]
     },
     "gpt-5.2-codex-failover": {

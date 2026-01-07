@@ -124,10 +124,27 @@ vim.api.nvim_create_autocmd({ "UIEnter", "BufReadPost", "BufNewFile" }, {
       vim.api.nvim_del_augroup_by_name "NvFilePost"
 
       vim.schedule(function()
-        vim.api.nvim_exec_autocmds("FileType", {})
+        local bufnr = args.buf
+        if not vim.api.nvim_buf_is_valid(bufnr) then
+          return
+        end
+
+        if vim.bo[bufnr].filetype == "" then
+          local name = vim.api.nvim_buf_get_name(bufnr)
+          local detected = vim.filetype.match { filename = name, buf = bufnr }
+          if detected then
+            vim.bo[bufnr].filetype = detected
+          else
+            vim.api.nvim_buf_call(bufnr, function()
+              vim.cmd("filetype detect")
+            end)
+          end
+        end
+
+        vim.api.nvim_exec_autocmds("FileType", { buffer = bufnr })
 
         if vim.g.editorconfig then
-          require("editorconfig").config(args.buf)
+          require("editorconfig").config(bufnr)
         end
       end, 0)
     end
