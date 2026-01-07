@@ -20,6 +20,7 @@ local servers = {
   "kotlin_language_server",
   "ruff",
   "clangd",
+  "vhdl_ls",
 }
 
 for _, lsp in ipairs(servers) do

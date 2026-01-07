@@ -1,5 +1,5 @@
 # prefer things in nix-profile over default macos installs
-set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" 
+set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" "/Applications/Tailscale.app/Contents/MacOS/"
 
 fnm env --use-on-cd --shell fish | source
 starship init fish | source
@@ -57,5 +57,5 @@ end
 
 function circuitsim
   cd $HOME/Developer/
-  java -jar "CS2110-CircuitSim.jar"
+  java -jar "CircuitSim.jar"
 end

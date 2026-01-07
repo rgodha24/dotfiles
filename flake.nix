@@ -57,6 +57,10 @@
               htop
               unzip
               btop
+              unnaturalscrollwheels
+              xquartz
+              catclock
+              kitty
 
               cachix
               typst

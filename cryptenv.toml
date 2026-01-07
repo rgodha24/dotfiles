@@ -33,16 +33,21 @@ STRIPE_TEST_KEY = "GRIFFIN_SCHOOL_STRIPE_TEST_SECRET"
 # OPENROUTER_API_KEY = "OPENROUTER_API_KEY"
 GOOGLE_GENERATIVE_AI_API_KEY = "GEMINI_API_KEY"
 ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+OPENAI_API_KEY = "OPENAI_API_KEY"
 # AWS_REGION = "AWS_REGION"
 # AWS_ACCESS_KEY_ID = "AI_AWS_ACCESS_KEY_ID"
 # AWS_SECRET_ACCESS_KEY = "AI_AWS_SECRET_ACCESS_KEY"
 DEEPGRAM_API_KEY = "DEEPGRAM_API_KEY"
+
+[profile.bog]
+BITWARDEN_PASSWORD = "BOG_BITWARDEN_PASSWORD"
 
 [project]
 unstoppable = ["unstoppable"]
 attendance = ["attendance"]
 "brainrot.mov" = ["brainrot"]
 sst = ["brainrot"]
+ican = ["bog"]
 
 [project.old-asset]
 profiles = ["unstoppable"]
