@@ -3,6 +3,8 @@
   pkgs,
   unstable,
   opencode,
+  system,
+  zellij,
   ...
 }: let
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
@@ -15,47 +17,6 @@
       sha256 = "sha256-LAdtxBmrIt+E/qJF80rtBvztTJbOI7+dzkRQHjUlivQ=";
     };
     cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
-  };
-  zellijSrc = pkgs.fetchFromGitHub {
-    owner = "rgodha24";
-    repo = "zellij";
-    rev = "89b055bf62189dc8dda570d23f9ec4a1a0e5f62a";
-    hash = "sha256-JrIHSg5L241E8Aa2wZUzOzlfRU1bcYRtqjx87EBI5tI=";
-  };
-  zellijPkg = unstable.rustPlatform.buildRustPackage {
-    pname = "zellij";
-    version = "0.44.0";
-    src = zellijSrc;
-
-    # Match nixpkgs behavior: link against system curl.
-    postPatch = ''
-      substituteInPlace Cargo.toml \
-        --replace-fail ', "vendored_curl"' ""
-    '';
-
-    cargoHash = "sha256-0vzYAIW7xWryqm3bJBpdzeJdPB8Y2ciJ+tMTTzpuK/M=";
-
-    env.OPENSSL_NO_VENDOR = 1;
-
-    nativeBuildInputs = [
-      pkgs.mandown
-      pkgs.installShellFiles
-      pkgs.pkg-config
-      (pkgs.lib.getDev pkgs.curl)
-    ];
-
-    buildInputs = [
-      pkgs.curl
-      pkgs.openssl
-    ];
-
-    doCheck = false;
-    doInstallCheck = false;
-
-    postInstall = ''
-      mandown docs/MANPAGE.md > zellij.1
-      installManPage zellij.1
-    '';
   };
 in {
   # Let Home Manager install and manage itself
@@ -99,8 +60,8 @@ in {
 
   # SSH allowed signers for git commit verification
   home.file.".ssh/allowed_signers".text = ''
-  git@rohangodha.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBGSYGWEg9n6XlaYavB1MyYk+H6IEBPec5DYLGWz6lPm rgodha@nixos
-  git@rohangodha.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEZYjP2+kqmmf3GCUPe/zIC9pKf/L9Ex/zmiy8o30SX3 rohangodha@mac.lan
+    git@rohangodha.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBGSYGWEg9n6XlaYavB1MyYk+H6IEBPec5DYLGWz6lPm rgodha@nixos
+    git@rohangodha.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEZYjP2+kqmmf3GCUPe/zIC9pKf/L9Ex/zmiy8o30SX3 rohangodha@mac.lan
   '';
 
   # Environment variables
@@ -128,7 +89,7 @@ in {
       htop
       unzip
       btop
-      zellijPkg
+      zellij.packages.${system}.default
 
       cachix
       typst

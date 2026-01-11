@@ -52,10 +52,8 @@ end
 function nixup
   if test (uname) = "Darwin"
     home-manager switch --flake ~/dotfiles#mac
-  else if type -q nixos-rebuild
-    sudo nixos-rebuild switch --flake ~/dotfiles#nixos
   else
-    nix profile upgrade dotfiles
+    sudo nixos-rebuild switch --flake ~/dotfiles#nixos
   end
 end
 
