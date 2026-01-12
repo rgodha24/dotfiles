@@ -55,64 +55,22 @@ local plugins = {
         end,
         desc = "Lazygit",
       },
+      {
+        "<leader>gd",
+        function()
+          Snacks.terminal.open("lumen diff")
+        end,
+        desc = "Lumen Diff",
+      },
     },
-    opts = { lazygit = { enabled = true } },
+    opts = { lazygit = { enabled = true }, terminal = { enabled = true } },
   },
 
   {
     "wakatime/vim-wakatime",
     lazy = false,
   },
-}
-
-if vim.fn.has "mac" == 1 then
-  table.insert(plugins, {
-    "yetone/avante.nvim",
-    opts = {
-      provider = "copilot",
-      copilot = {
-        model = "claude-sonnet-4",
-        disabled_tools = { "python" },
-      },
-    },
-    lazy = false,
-    build = "make",
-    dependencies = {
-      "nvim-treesitter/nvim-treesitter",
-      "stevearc/dressing.nvim",
-      "nvim-lua/plenary.nvim",
-      "MunifTanjim/nui.nvim",
-      "nvim-tree/nvim-web-devicons",
-      {
-        "zbirenbaum/copilot.lua",
-        event = "VeryLazy",
-        opts = {
-          copilot_node_command = vim.fn.expand "$HOME" .. "/.nix-profile/bin/node",
-        },
-      },
-      {
-        "HakonHarnes/img-clip.nvim",
-        event = "VeryLazy",
-        opts = {
-          default = {
-            embed_image_as_base64 = false,
-            prompt_for_file_name = false,
-            drag_and_drop = {
-              insert_mode = true,
-            },
-          },
-        },
-      },
-      {
-        "MeanderingProgrammer/render-markdown.nvim",
-        opts = {
-          file_types = { "Avante" },
-        },
-        ft = { "Avante" },
-      },
-    },
-  })
-  table.insert(plugins, {
+  {
     "supermaven-inc/supermaven-nvim",
     event = "InsertEnter",
     opts = {
@@ -124,7 +82,7 @@ if vim.fn.has "mac" == 1 then
         return string.match(vim.fn.expand "%:p", vim.fn.expand "~/Classes")
       end,
     },
-  })
-end
+  },
+}
 
 return plugins

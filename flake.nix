@@ -27,6 +27,13 @@
       url = "github:rgodha24/zellij";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
+    worktrunk = {
+      url = "github:max-sixty/worktrunk";
+      inputs.nixpkgs.follows = "pkgsunstable";
+    };
+    lumen = {
+      url = "github:rgodha24/lumen";
+    };
   };
 
   outputs = {
@@ -38,6 +45,8 @@
     fenix,
     opencode,
     zellij,
+    worktrunk,
+    lumen,
     ...
   }: let
     linuxSystem = "x86_64-linux";
@@ -80,6 +89,8 @@
               inherit fenixPkgs;
               inherit opencode;
               inherit zellij;
+              inherit worktrunk;
+              inherit lumen;
             };
           };
 
@@ -96,6 +107,8 @@
         unstable = unstableFor darwinSystem;
         inherit opencode;
         inherit zellij;
+        inherit worktrunk;
+        inherit lumen;
       };
       modules = [
         ./home/common.nix

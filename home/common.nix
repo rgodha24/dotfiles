@@ -5,6 +5,8 @@
   opencode,
   system,
   zellij,
+  worktrunk,
+  lumen,
   ...
 }: let
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
@@ -90,6 +92,8 @@ in {
       unzip
       btop
       zellij.packages.${system}.default
+      worktrunk.packages.${system}.default
+      lumen.packages.${system}.default
 
       cachix
       typst

@@ -74,3 +74,26 @@ function circuitsim
   cd $HOME/Developer/
   java -jar "CS2110-CircuitSim.jar"
 end
+
+function oc 
+  cryptenv run ai -- opencode $argv
+end
+
+# worktrunk shell integration:
+function wt
+  set -l WORKTRUNK_BIN (type -P wt)
+  set -l directive_file (mktemp)
+
+  WORKTRUNK_DIRECTIVE_FILE=$directive_file command $WORKTRUNK_BIN $argv
+  set -l exit_code $status
+
+  if test -s "$directive_file"
+    eval (cat "$directive_file" | string collect)
+    if test $exit_code -eq 0
+      set exit_code $status
+    end
+  end
+
+  rm -F "$directive_file"
+  return $exit_code
+end
