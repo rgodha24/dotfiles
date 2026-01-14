@@ -20,6 +20,78 @@
     };
     cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
   };
+
+  cursorAgentVersion = "2026.01.09-231024f";
+  cursorAgentArch =
+    if system == "x86_64-linux"
+    then {
+      os = "linux";
+      arch = "x64";
+    }
+    else if system == "aarch64-linux"
+    then {
+      os = "linux";
+      arch = "arm64";
+    }
+    else if system == "x86_64-darwin"
+    then {
+      os = "darwin";
+      arch = "x64";
+    }
+    else if system == "aarch64-darwin"
+    then {
+      os = "darwin";
+      arch = "arm64";
+    }
+    else throw "Unsupported system: ${system}";
+
+  cursorAgentPkg = pkgs.stdenv.mkDerivation {
+    pname = "cursor-agent";
+    version = cursorAgentVersion;
+
+    src = pkgs.fetchurl {
+      url = "https://downloads.cursor.com/lab/${cursorAgentVersion}/${cursorAgentArch.os}/${cursorAgentArch.arch}/agent-cli-package.tar.gz";
+      sha256 = "sha256-FT4dPRYXWVLnl02KevhiMuh6F3P9Bu+YJXiWrQtH2vo=";
+    };
+
+    nativeBuildInputs = [pkgs.autoPatchelfHook];
+    buildInputs = [pkgs.stdenv.cc.cc.lib];
+
+    sourceRoot = ".";
+
+    unpackPhase = ''
+      mkdir -p source
+      tar -xzf $src -C source
+      mv source/dist-package/* source/
+      rmdir source/dist-package
+    '';
+
+    installPhase = ''
+      runHook preInstall
+
+      mkdir -p $out/lib/cursor-agent
+      cp -r source/* $out/lib/cursor-agent/
+
+      # Create wrapper scripts in bin
+      mkdir -p $out/bin
+      cat > $out/bin/cursor-agent <<'WRAPPER'
+      #!/usr/bin/env bash
+      exec "@out@/lib/cursor-agent/node" "@out@/lib/cursor-agent/index.js" "$@"
+      WRAPPER
+      substituteInPlace $out/bin/cursor-agent --replace "@out@" "$out"
+      chmod +x $out/bin/cursor-agent
+      ln -s $out/bin/cursor-agent $out/bin/agent
+
+      runHook postInstall
+    '';
+
+    meta = with pkgs.lib; {
+      description = "Cursor Agent CLI";
+      homepage = "https://cursor.com";
+      platforms = ["x86_64-linux" "aarch64-linux" "x86_64-darwin" "aarch64-darwin"];
+      mainProgram = "agent";
+    };
+  };
 in {
   # Let Home Manager install and manage itself
   programs.home-manager.enable = true;
@@ -38,6 +110,7 @@ in {
       gpg.format = "ssh";
       gpg.ssh.allowedSignersFile = "~/.ssh/allowed_signers";
       user.signingkey = "~/.ssh/id_ed25519";
+      rerere.enabled = true;
     };
   };
 
@@ -156,5 +229,6 @@ in {
     ])
     ++ [
       cryptenvPkg
+      cursorAgentPkg
     ];
 }

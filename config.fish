@@ -94,6 +94,6 @@ function wt
     end
   end
 
-  rm -F "$directive_file"
+  rm -f "$directive_file"
   return $exit_code
 end
