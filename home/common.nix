@@ -187,6 +187,8 @@ in {
       unstable.neovim
       unstable.vscode
       unstable.code-cursor
+      unstable.code-cursor
+      unstable.antigravity
 
       opencode.packages.${system}.default
       unstable.codex
