@@ -118,7 +118,7 @@
   users.users.rgodha = {
     isNormalUser = true;
     description = "Rohan Godha";
-    extraGroups = ["networkmanager" "wheel" "docker"];
+    extraGroups = ["networkmanager" "wheel" "docker" "adbusers"];
     packages = with pkgs; [git];
     shell = pkgs.fish;
   };
@@ -147,6 +147,7 @@
   programs.hyprland.enable = true;
   programs.fish.enable = true;
   programs.steam.enable = true;
+  programs.adb.enable = true;
 
   # Enable Docker
   virtualisation.docker = {
@@ -197,7 +198,16 @@
 
   networking.firewall.allowedTCPPorts = [3000];
 
-  hardware.bluetooth.enable = true;
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = true;
+    settings = {
+      General = {
+        Enable = "Source,Sink,Media,Socket";
+        Experimental = true; # Needed for some LE features
+      };
+    };
+  };
   services.blueman.enable = true;
   security.polkit.enable = true;
 
