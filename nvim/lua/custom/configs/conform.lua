@@ -25,15 +25,15 @@ local options = {
     toml = { "taplo" },
     kotlin = { "ktlint" },
   },
-
-  -- adding same formatter for multiple filetypes can look too much work for some
-  -- instead of the above code you could just use a loop! the config is just a table after all!
-
-  format_on_save = {
-    -- These options will be passed to conform.format()
-    timeout_ms = 1000,
-    lsp_fallback = true,
-  },
+  format_on_save = function()
+    if not vim.g.autoformat_enabled then
+      return nil
+    end
+    return {
+      timeout_ms = 1000,
+      lsp_fallback = true,
+    }
+  end,
 }
 
 require("conform").setup(options)

@@ -38,8 +38,9 @@
     "opus-4.5-failover": {
       "name": "Claude Opus 4.5 (Failover)",
       "chain": [
-        { "provider": "google", "model": "antigravity-claude-opus-4-5-thinking" },
-        { "provider": "github-copilot", "model": "claude-opus-4.5" }
+        { "provider": "amazon-bedrock", "model": "global.anthropic.claude-opus-4-5-20251101-v1:0" },
+        { "provider": "github-copilot", "model": "claude-opus-4.5" },
+        { "provider": "google", "model": "antigravity-claude-opus-4-5-thinking" }
       ]
     },
     "gpt-5.2-codex-failover": {

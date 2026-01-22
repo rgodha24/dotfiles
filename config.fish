@@ -70,11 +70,6 @@ function ai
   cryptenv run ai -- $argv
 end
 
-function circuitsim
-  cd $HOME/Developer/
-  java -jar "CS2110-CircuitSim.jar"
-end
-
 function oc 
   cryptenv run ai -- opencode $argv
 end
@@ -96,4 +91,36 @@ function wt
 
   rm -f "$directive_file"
   return $exit_code
+end
+
+function za
+  set -l session_name $argv[1]
+  set -l sessions (zellij list-sessions -s 2>/dev/null)
+
+  # if exact match exists, attach directly
+  if contains -- $session_name $sessions
+    zellij a $session_name
+    return
+  end
+
+  # build fzf input: user's session name (if provided) + existing sessions
+  set -l fzf_input
+  if test -n "$session_name"
+    set fzf_input $session_name
+  end
+  set -a fzf_input $sessions
+
+  # dedupe and run fzf
+  set -l selected (printf '%s\n' $fzf_input | sort -u | fzf --prompt="zellij session: ")
+
+  if test -z "$selected"
+    return 1
+  end
+
+  # attach if session exists, otherwise create it
+  if contains -- $selected $sessions
+    zellij a $selected
+  else
+    zellij -s $selected
+  end
 end

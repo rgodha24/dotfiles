@@ -118,7 +118,7 @@
   users.users.rgodha = {
     isNormalUser = true;
     description = "Rohan Godha";
-    extraGroups = ["networkmanager" "wheel" "docker" "adbusers"];
+    extraGroups = ["networkmanager" "wheel" "docker" "adbusers" "dialout"];
     packages = with pkgs; [git];
     shell = pkgs.fish;
   };
