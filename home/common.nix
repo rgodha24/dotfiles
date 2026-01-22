@@ -21,7 +21,13 @@
     cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
   };
 
-  cursorAgentVersion = "2026.01.09-231024f";
+  cursorAgentVersion = "2026.01.17-d239e66";
+  cursorAgentSha256 = {
+    x86_64-linux = "sha256-gZPjmxJxppni1tBL+4KNzP7It8vN0qG0e+xG42Cu/tM=";
+    aarch64-linux = "sha256-+ZTHbrRzte79MPrgCBb+Yj8GZaPCcDjc0v9vLI8wmoI=";
+    x86_64-darwin = "sha256-6LNXzVh7hpAFZWCZUECJKIv9RzuWih3G/+9cFjof2zM=";
+    aarch64-darwin = "sha256-mUjH/9ADFgsCdCvUmSUMbepJUHA/4bz7I01c51tlAM8=";
+  };
   cursorAgentArch =
     if system == "x86_64-linux"
     then {
@@ -51,11 +57,11 @@
 
     src = pkgs.fetchurl {
       url = "https://downloads.cursor.com/lab/${cursorAgentVersion}/${cursorAgentArch.os}/${cursorAgentArch.arch}/agent-cli-package.tar.gz";
-      sha256 = "sha256-FT4dPRYXWVLnl02KevhiMuh6F3P9Bu+YJXiWrQtH2vo=";
+      sha256 = cursorAgentSha256.${system};
     };
 
-    nativeBuildInputs = [pkgs.autoPatchelfHook];
-    buildInputs = [pkgs.stdenv.cc.cc.lib];
+    nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.autoPatchelfHook];
+    buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.stdenv.cc.cc.lib];
 
     sourceRoot = ".";
 
