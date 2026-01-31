@@ -50,5 +50,10 @@
         { "provider": "github-copilot", "model": "gpt-5.2" }
       ]
     }
+  },
+  "permission": {
+    "external_directory": {
+      "/mnt/github/**": "allow"
+    }
   }
 }

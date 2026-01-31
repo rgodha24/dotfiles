@@ -120,6 +120,15 @@ in {
     };
   };
 
+  programs.lazygit = {
+    enable = true;
+    settings = {
+      git = {
+        overrideGpg = true;
+      };
+    };
+  };
+
   # shell stuff
   programs.fish = {
     enable = true;
@@ -132,6 +141,20 @@ in {
   home.file.".config/cryptenv.toml".source = ../cryptenv.toml;
   home.file.".config/zellij/config.kdl".source = ../zellij.kdl;
   home.file.".config/opencode/opencode.jsonc".source = ../opencode/config.json5;
+
+  # Skills for AI coding assistants (opencode, claude, codex, cursor)
+  home.file.".config/opencode/skills" = {
+    source = ../skills;
+    recursive = true;
+  };
+  home.file.".claude/skills" = {
+    source = ../skills;
+    recursive = true;
+  };
+  home.file.".codex/skills" = {
+    source = ../skills;
+    recursive = true;
+  };
 
   # Neovim configuration
   home.file.".config/nvim" = {
