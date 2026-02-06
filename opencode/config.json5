@@ -35,19 +35,26 @@
     }
   },
   "failover": {
+    "opus-4.6-failover": {
+      "name": "Claude Opus 4.6 (Failover)",
+      "chain": [
+        { "provider": "github-copilot", "model": "claude-opus-4.6" },
+        { "provider": "amazon-bedrock", "model": "anthropic.claude-opus-4-6-v1" },
+      ]
+    },
     "opus-4.5-failover": {
       "name": "Claude Opus 4.5 (Failover)",
       "chain": [
-        { "provider": "amazon-bedrock", "model": "global.anthropic.claude-opus-4-5-20251101-v1:0" },
+        { "provider": "google", "model": "antigravity-claude-opus-4-5-thinking" },
         { "provider": "github-copilot", "model": "claude-opus-4.5" },
-        { "provider": "google", "model": "antigravity-claude-opus-4-5-thinking" }
+        { "provider": "amazon-bedrock", "model": "global.anthropic.claude-opus-4-5-20251101-v1:0" },
       ]
     },
-    "gpt-5.2-codex-failover": {
-      "name": "GPT 5.2 Codex (Failover)",
+    "gpt-5.3-codex-failover": {
+      "name": "GPT 5.3 Codex (Failover)",
       "chain": [
-        { "provider": "openai", "model": "gpt-5.2-codex" },
-        { "provider": "github-copilot", "model": "gpt-5.2" }
+        { "provider": "openai", "model": "gpt-5.3-codex" },
+        { "provider": "github-copilot", "model": "gpt-5.2-codex" }
       ]
     }
   },

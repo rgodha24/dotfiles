@@ -10,8 +10,7 @@
 
 - `nix flake check` validates the flake, runs Nix formatter hooks, and catches missing module options early.
 - `sudo nixos-rebuild switch --flake .#nixos` applies OS changes locally; use `test` instead of `switch` for a temporary boot.
-  - NOTE: you should tell the user to run this. Running this yourself often bugs out the CLI you run in.
-- `home-manager switch --flake .#rgodha` syncs the user environment; add `--dry-run` while iterating on dotfiles.
+  - NOTE: you should tell the user to run this. Running this yourself often bugs out the CLI you run in. do not EVER RUN IT YOURSELF.
 
 ## Coding Style & Naming Conventions
 
@@ -20,19 +19,20 @@
 - Keep TOML (`starship.toml`, `cryptenv.toml`) machine-aligned with `taplo fmt`, and run `fish_indent -w config.fish` for shell tweaks.
 - Name new modules after their scope (`nvim/lua/plugins/git.lua`, `modules/waybar-theme.nix`) and default to lowercase-hyphenated filenames.
 
-## Testing Guidelines
-
-- Run `nix flake check` plus `home-manager switch --dry-run --flake .#rgodha` for every PR; both should pass without prompting.
-- For window-manager updates, launch a nested session (`dbus-run-session hyprland`) and verify Waybar/Dunst without disrupting a daily driver.
-- Capture Neovim health with `nvim --headless "+checkhealth" "+qa"` when touching LSP or plugin configs.
-
 ## Commit & Pull Request Guidelines
 
 - Follow the existing log: a single, lowercase imperative summary (`fix zen browser`, `update waybar`) capped at ~60 chars.
-- Squash noisy work-in-progress commits; sign commits via SSH keys as configured in `home.nix`.
+- Squash noisy work-in-progress commits
 - PRs should describe the scope, list validation commands, and attach UI screenshots for Waybar/Hyprland tweaks. Link related issues or upstream bumps when updating flakes or pinned packages.
 
 ## Security & Configuration Tips
 
 - Never commit secrets—store environment credentials with `cryptenv` and reference them via its profiles.
 - Keep binary assets (e.g., `background.jpg`) lightweight; prefer symlinks via Home Manager for personal files not meant for source control.
+
+## files:
+
+`nvim/` has neovim config
+`opencode/` has opencode config
+`skills/` has skills for agents. if i ask you to install a skill with a gh repo, use this and the ghfs skill.
+`home/*.nix` has lots of home manager stuff. you should probably always install to `home/common.nix` unless it is specifically mac/linux only.

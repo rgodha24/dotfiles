@@ -53,7 +53,6 @@ in {
       geekbench
       discord
       davinci-resolve
-      quartus-prime-lite
 
       xdg-utils
       ncspot

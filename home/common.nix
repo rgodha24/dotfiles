@@ -142,16 +142,9 @@ in {
   home.file.".config/zellij/config.kdl".source = ../zellij.kdl;
   home.file.".config/opencode/opencode.jsonc".source = ../opencode/config.json5;
 
-  # Skills for AI coding assistants (opencode, claude, codex, cursor)
-  home.file.".config/opencode/skills" = {
-    source = ../skills;
-    recursive = true;
-  };
-  home.file.".claude/skills" = {
-    source = ../skills;
-    recursive = true;
-  };
-  home.file.".codex/skills" = {
+  # works for everything EXCEPT claude code.
+  # fuck claude code.
+  home.file.".agents/skills" = {
     source = ../skills;
     recursive = true;
   };
@@ -238,7 +231,7 @@ in {
       typescript
       nodejs_20
       cargo-lambda
-      zig_0_12
+      unstable.zig
       postgresql_17_jit
       # Formatters and LSPs
       typescript-language-server
