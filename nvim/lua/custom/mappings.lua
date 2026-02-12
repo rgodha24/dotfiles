@@ -27,6 +27,10 @@ M.general = {
       ":split<CR>",
       "split horizontally",
     },
+    ["<leader>tp"] = {
+      "<cmd> TypstPreviewToggle <CR>",
+      "toggle typst preview",
+    },
   },
   v = {
     [">"] = { ">gv", "indent" },

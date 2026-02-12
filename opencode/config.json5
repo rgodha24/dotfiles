@@ -22,6 +22,15 @@
              "max": { "thinkingConfig": { "thinkingBudget": 32768 } }
            }
          },
+         "antigravity-claude-opus-4-6-thinking": {
+           "name": "Claude Opus 4.6 Thinking",
+           "limit": { "context": 200000, "output": 64000 },
+           "modalities": { "input": ["text", "image", "pdf"], "output": ["text"] },
+           "variants": {
+             "low": { "thinkingConfig": { "thinkingBudget": 8192 } },
+             "max": { "thinkingConfig": { "thinkingBudget": 32768 } }
+           }
+         },
          "antigravity-gemini-3-pro": {
            "name": "Gemini 3 Pro (Antigravity)",
            "limit": { "context": 1048576, "output": 65535 },
@@ -38,6 +47,7 @@
     "opus-4.6-failover": {
       "name": "Claude Opus 4.6 (Failover)",
       "chain": [
+        { "provider": "google", "model": "antigravity-claude-opus-4-6-thinking" },
         { "provider": "github-copilot", "model": "claude-opus-4.6" },
         { "provider": "amazon-bedrock", "model": "anthropic.claude-opus-4-6-v1" },
       ]

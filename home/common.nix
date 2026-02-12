@@ -238,6 +238,8 @@ in {
       svelte-language-server
       clang-tools
       astro-language-server
+      cmake
+      gnumake
 
       corepack
       unstable.bun
