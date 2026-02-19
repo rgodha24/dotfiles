@@ -87,6 +87,7 @@ in {
   programs.zen-browser = {
     enable = true;
     package = zenWrapped;
+    suppressXdgMigrationWarning = true;
     policies = {
       DisableAppUpdate = true;
       DisableTelemetry = true;
@@ -110,6 +111,5 @@ in {
   # Environment variables
   home.sessionVariables = {
     BROWSER = "zen";
-    LM_LICENSE_FILE = "/home/rgodha/Downloads/LR-264460_FIXED.dat";
   };
 }
