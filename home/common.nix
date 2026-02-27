@@ -102,6 +102,8 @@ in {
   # Let Home Manager install and manage itself
   programs.home-manager.enable = true;
 
+  services.ghfs.enable = true;
+
   # Git configuration
   programs.git = {
     enable = true;
@@ -214,6 +216,7 @@ in {
 
       opencode.packages.${system}.default
       unstable.codex
+      unstable.claude-code
 
       unstable.prettierd
       stylua

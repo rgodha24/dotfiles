@@ -27,6 +27,10 @@
       url = "github:rgodha24/zellij";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
+    ghfs = {
+      url = "github:rgodha24/ghfs";
+      inputs.nixpkgs.follows = "pkgsunstable";
+    };
     worktrunk = {
       url = "github:max-sixty/worktrunk";
       inputs.nixpkgs.follows = "pkgsunstable";
@@ -45,6 +49,7 @@
     fenix,
     opencode,
     zellij,
+    ghfs,
     worktrunk,
     lumen,
     ...
@@ -76,6 +81,7 @@
             useGlobalPkgs = true;
             useUserPackages = true;
             backupFileExtension = "backup";
+            sharedModules = [ghfs.homeManagerModules.default];
             users.rgodha = {
               imports = [
                 zen-browser.homeModules.beta
@@ -111,6 +117,7 @@
         inherit lumen;
       };
       modules = [
+        ghfs.homeManagerModules.default
         ./home/common.nix
         ./home/darwin.nix
       ];
