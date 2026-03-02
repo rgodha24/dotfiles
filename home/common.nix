@@ -21,12 +21,12 @@
     cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
   };
 
-  cursorAgentVersion = "2026.01.28-fd13201";
+  cursorAgentVersion = "2026.02.27-e7d2ef6";
   cursorAgentSha256 = {
-    x86_64-linux = "sha256-Nj6q11iaa++b5stsEu1eBRAYUFRPft84XcHuTCZL5D0=";
-    aarch64-linux = "sha256-6oajVZw599vzy2c1olEzoIlqbmfZRK1atb85fiR72y0=";
-    x86_64-darwin = "sha256-G23LC7Sl1GjfaECndSuyCxHK4drkJKG3B1U2k5SAHJA=";
-    aarch64-darwin = "sha256-R5kEfd84IaUXuN+PIzpGD1NGPzD6xxM9NAXAAt6d0N8=";
+    x86_64-linux = "sha256-QdNrUbDdA6dBUXa7iqumKsxrK4boySCWxCJ3FR9csqw=";
+    aarch64-linux = "sha256-sG+kYYcXlbXMKaJIG4C6rqRECph31Ol6ah2gCxj1gaE=";
+    x86_64-darwin = "sha256-0GvOg1y7O27PFdwz+QDhMnNeDWbFFzmbk3me1oHsJJ4=";
+    aarch64-darwin = "sha256-IZEE+ckKRTDi3sDLqKqJkmyM3UH9FH0trRBcfSqAVeg=";
   };
   cursorAgentArch =
     if system == "x86_64-linux"
@@ -147,6 +147,10 @@ in {
   # works for everything EXCEPT claude code.
   # fuck claude code.
   home.file.".agents/skills" = {
+    source = ../skills;
+    recursive = true;
+  };
+  home.file.".claude/skills" = {
     source = ../skills;
     recursive = true;
   };
