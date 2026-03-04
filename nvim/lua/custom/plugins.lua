@@ -57,7 +57,6 @@ local plugins = {
     },
     opts = {
       follow_cursor = true,
-      open_cmd = "open",
       dependencies_bin = {
         tinymist = "tinymist",
       },

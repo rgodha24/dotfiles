@@ -51,7 +51,7 @@ end
 
 function nixup
   if test (uname) = "Darwin"
-    home-manager switch --flake ~/dotfiles#mac
+    home-manager switch -b backup --flake ~/dotfiles#mac
   else
     sudo nixos-rebuild switch --flake ~/dotfiles#nixos
   end

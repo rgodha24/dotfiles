@@ -215,7 +215,7 @@ in {
       unstable.neovim
       unstable.vscode
       unstable.code-cursor
-      unstable.code-cursor
+      unstable.zed
       unstable.antigravity
 
       opencode.packages.${system}.default

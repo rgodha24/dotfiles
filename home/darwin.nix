@@ -11,5 +11,6 @@
     catclock
     kitty
     rustup
+    pkgconf
   ];
 }
