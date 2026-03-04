@@ -1,29 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [],
-  "failover": {
-    "opus-4.6-failover": {
-      "name": "Claude Opus 4.6 (Failover)",
-      "chain": [
-        { "provider": "github-copilot", "model": "claude-opus-4.6" },
-        { "provider": "amazon-bedrock", "model": "anthropic.claude-opus-4-6-v1" },
-      ]
-    },
-    "opus-4.5-failover": {
-      "name": "Claude Opus 4.5 (Failover)",
-      "chain": [
-        { "provider": "github-copilot", "model": "claude-opus-4.5" },
-        { "provider": "amazon-bedrock", "model": "global.anthropic.claude-opus-4-5-20251101-v1:0" },
-      ]
-    },
-    "gpt-5.3-codex-failover": {
-      "name": "GPT 5.3 Codex (Failover)",
-      "chain": [
-        { "provider": "openai", "model": "gpt-5.3-codex" },
-        { "provider": "github-copilot", "model": "gpt-5.2-codex" }
-      ]
-    }
-  },
   "permission": {
     "external_directory": {
       "/mnt/github/**": "allow",

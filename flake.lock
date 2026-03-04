@@ -421,11 +421,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1772583463,
-        "narHash": "sha256-luOQVhWm1nfhbyio+OZoVH7mJwmwOMNae/89MOAG2EI=",
+        "lastModified": 1772659218,
+        "narHash": "sha256-Xmp/wEjNzClRI1TS6TdhhvA/jLFsnr1rNWQxwk/pJWQ=",
         "owner": "rgodha24",
         "repo": "opencode",
-        "rev": "91b972130ef6bc0ccb771e89d4a765b3ffbe5466",
+        "rev": "b0a5431bb6decd9b5551f2445d0000cd984b368d",
         "type": "github"
       },
       "original": {
