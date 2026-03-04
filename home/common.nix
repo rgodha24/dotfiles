@@ -21,12 +21,12 @@
     cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
   };
 
-  cursorAgentVersion = "2026.02.27-e7d2ef6";
+  cursorAgentVersion = "2026.03.04-c28b141";
   cursorAgentSha256 = {
-    x86_64-linux = "sha256-QdNrUbDdA6dBUXa7iqumKsxrK4boySCWxCJ3FR9csqw=";
-    aarch64-linux = "sha256-sG+kYYcXlbXMKaJIG4C6rqRECph31Ol6ah2gCxj1gaE=";
-    x86_64-darwin = "sha256-0GvOg1y7O27PFdwz+QDhMnNeDWbFFzmbk3me1oHsJJ4=";
-    aarch64-darwin = "sha256-IZEE+ckKRTDi3sDLqKqJkmyM3UH9FH0trRBcfSqAVeg=";
+    x86_64-linux = "sha256-vdmDVvhWyO8nQr7kmp+5fCiOitl3RPd5chhNUnq/9A8=";
+    aarch64-linux = "sha256-E/kFzsTt308+c+LjwtbmuyTWOmKyUEEVOJIJPJPk4gQ=";
+    x86_64-darwin = "sha256-KGPAw4NwxFIatcY0XI1Vp4RT5fCcgvdlpnYnclEaYF4=";
+    aarch64-darwin = "sha256-ush8WJOjwI+WHprAC8V6LR7coDZa6K2nONkovH/e75Q=";
   };
   cursorAgentArch =
     if system == "x86_64-linux"
