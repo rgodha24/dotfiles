@@ -154,6 +154,10 @@ in {
     source = ../skills;
     recursive = true;
   };
+  home.file.".cursor/skills" = {
+    source = ../skills;
+    recursive = true;
+  };
 
   # Neovim configuration
   home.file.".config/nvim" = {
@@ -185,7 +189,7 @@ in {
       jq
       gnupg
       fzf
-      ffmpeg-full
+      ffmpeg
       yt-dlp
       gimp
       gnuplot
@@ -231,7 +235,7 @@ in {
       luajitPackages.tiktoken_core
       lynx
 
-      zulu17
+      jdk21
       jdt-language-server
       go
       gopls

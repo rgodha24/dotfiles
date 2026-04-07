@@ -4,6 +4,7 @@
 {
   config,
   pkgs,
+  unstable,
   ...
 }: {
   imports = [
@@ -34,10 +35,12 @@
   nix.settings.substituters = [
     "https://cache.nixos.org"
     "https://cuda-maintainers.cachix.org"
+    "https://cache.nixos-cuda.org"
   ];
   nix.settings.trusted-public-keys = [
     "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
     "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
+    "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
   ];
 
   networking.hostName = "nixos"; # Define your hostname.
@@ -142,6 +145,9 @@
     xorg.xclock
     xorg.xeyes
     tailscale
+    unstable.cudaPackages_13.cudatoolkit
+    unstable.cudaPackages_13.libcublas
+    unstable.cudaPackages_13.cudnn
   ];
 
   programs.hyprland.enable = true;
@@ -161,6 +167,7 @@
   environment.variables = {
     GTK_THEME = "Adwaita:dark";
     QT_STYLE_OVERRIDE = "adwaita-dark";
+
   };
 
   qt = {
@@ -196,7 +203,7 @@
     };
   };
 
-  networking.firewall.allowedTCPPorts = [3000];
+  networking.firewall.allowedTCPPorts = [3000 8000];
 
   hardware.bluetooth = {
     enable = true;
@@ -217,8 +224,23 @@
     modesetting.enable = true;
     open = true; # recommended for 5060ti
     nvidiaSettings = true;
-    package = config.boot.kernelPackages.nvidiaPackages.latest;
+    package = config.boot.kernelPackages.nvidiaPackages.mkDriver {
+      version = "595.58.03";
+      sha256_64bit = "sha256-jA1Plnt5MsSrVxQnKu6BAzkrCnAskq+lVRdtNiBYKfk=";
+      sha256_aarch64 = "sha256-hzzIKY1Te8QkCBWR+H5k1FB/HK1UgGhai6cl3wEaPT8=";
+      openSha256 = "sha256-6LvJyT0cMXGS290Dh8hd9rc+nYZqBzDIlItOFk8S4n8=";
+      settingsSha256 = "sha256-2vLF5Evl2D6tRQJo0uUyY3tpWqjvJQ0/Rpxan3NOD3c=";
+      persistencedSha256 = "sha256-AtjM/ml/ngZil8DMYNH+P111ohuk9mWw5t4z7CHjPWw=";
+    };
   };
+
+  # expose CUDA/driver libs to unpatched binaries (uv, pip, etc.) via nix-ld
+  programs.nix-ld.libraries = with pkgs; [
+    stdenv.cc.cc.lib
+    zlib
+    libGL
+    config.hardware.nvidia.package
+  ];
 
   services.tailscale = {
     enable = true;

@@ -70,6 +70,7 @@
     fenixPkgs = fenix.packages.${linuxSystem};
   in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+      specialArgs = { inherit unstable; };
       system = linuxSystem;
       modules = [
         determinate.nixosModules.default
@@ -91,6 +92,7 @@
             extraSpecialArgs = {
               inherit zen-browser;
               inherit unstable;
+              inherit pkgsunstable;
               system = linuxSystem;
               inherit fenixPkgs;
               inherit opencode;

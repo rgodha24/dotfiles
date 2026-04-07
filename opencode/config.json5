@@ -6,6 +6,7 @@
       "/mnt/github/**": "allow",
       "/tmp/ghfs/**": "allow",
       "~/.cargo/registry/src/**": "allow",
+      "~/Developer/**": "allow",
     }
   }
 }

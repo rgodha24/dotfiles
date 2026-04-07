@@ -87,7 +87,6 @@ in {
   programs.zen-browser = {
     enable = true;
     package = zenWrapped;
-    suppressXdgMigrationWarning = true;
     policies = {
       DisableAppUpdate = true;
       DisableTelemetry = true;

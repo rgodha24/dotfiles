@@ -32,6 +32,11 @@ alias n="nvim ."
 alias t="eza -T --git-ignore"
 if test (uname) = "Linux"
   alias reboot-windows='sudo bootctl set-oneshot auto-windows && sudo reboot'
+
+  # NVIDIA CUDA
+  set -x CUDA_PATH "$HOME/.nix-profile"
+  set -x CUDA_HOME $CUDA_PATH
+  set -x LD_LIBRARY_PATH "$HOME/.nix-profile/lib" "$HOME/.nix-profile/lib64" $LD_LIBRARY_PATH
 end
 
 function gc 
