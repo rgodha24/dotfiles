@@ -15,6 +15,8 @@
       inputs.home-manager.follows = "home-manager";
     };
     pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # pinned for neovim 0.11 until plugins are compatible with 0.12
+    pkgs-neovim.url = "github:NixOS/nixpkgs/2fc6539b481e1d2569f25f8799236694180c0993";
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -43,6 +45,7 @@
   outputs = {
     nixpkgs,
     pkgsunstable,
+    pkgs-neovim,
     home-manager,
     determinate,
     zen-browser,
@@ -67,6 +70,10 @@
         config.allowUnfree = true;
       };
     unstable = unstableFor linuxSystem;
+    neovim-pin = (import pkgs-neovim {
+      system = linuxSystem;
+      config.allowUnfree = true;
+    }).neovim;
     fenixPkgs = fenix.packages.${linuxSystem};
   in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
@@ -99,6 +106,7 @@
               inherit zellij;
               inherit worktrunk;
               inherit lumen;
+              inherit neovim-pin;
             };
           };
 
@@ -117,6 +125,10 @@
         inherit zellij;
         inherit worktrunk;
         inherit lumen;
+        neovim-pin = (import pkgs-neovim {
+          system = darwinSystem;
+          config.allowUnfree = true;
+        }).neovim;
       };
       modules = [
         ghfs.homeManagerModules.default

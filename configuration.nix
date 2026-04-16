@@ -167,7 +167,6 @@
   environment.variables = {
     GTK_THEME = "Adwaita:dark";
     QT_STYLE_OVERRIDE = "adwaita-dark";
-
   };
 
   qt = {
@@ -204,6 +203,14 @@
   };
 
   networking.firewall.allowedTCPPorts = [3000 8000];
+  networking.firewall.extraCommands = ''
+    iptables -t mangle -A INPUT -p tcp --tcp-flags SYN,RST SYN -i tailscale0 -j TCPMSS --set-mss 1100
+    iptables -t mangle -A OUTPUT -p tcp --tcp-flags SYN,RST SYN -o tailscale0 -j TCPMSS --set-mss 1100
+  '';
+  networking.firewall.extraStopCommands = ''
+    iptables -t mangle -D INPUT -p tcp --tcp-flags SYN,RST SYN -i tailscale0 -j TCPMSS --set-mss 1100 2>/dev/null || true
+    iptables -t mangle -D OUTPUT -p tcp --tcp-flags SYN,RST SYN -o tailscale0 -j TCPMSS --set-mss 1100 2>/dev/null || true
+  '';
 
   hardware.bluetooth = {
     enable = true;

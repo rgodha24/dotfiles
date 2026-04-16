@@ -7,6 +7,7 @@
   zellij,
   worktrunk,
   lumen,
+  neovim-pin,
   ...
 }: let
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
@@ -216,7 +217,7 @@ in {
 
       starship
       fish
-      unstable.neovim
+      neovim-pin
       unstable.vscode
       unstable.code-cursor
       unstable.zed

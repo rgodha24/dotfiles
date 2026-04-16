@@ -434,6 +434,22 @@
         "type": "github"
       }
     },
+    "pkgs-neovim": {
+      "locked": {
+        "lastModified": 1771848320,
+        "narHash": "sha256-0MAd+0mun3K/Ns8JATeHT1sX28faLII5hVLq0L3BdZU=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2fc6539b481e1d2569f25f8799236694180c0993",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2fc6539b481e1d2569f25f8799236694180c0993",
+        "type": "github"
+      }
+    },
     "pkgsunstable": {
       "locked": {
         "lastModified": 1775423009,
@@ -459,6 +475,7 @@
         "lumen": "lumen",
         "nixpkgs": "nixpkgs_3",
         "opencode": "opencode",
+        "pkgs-neovim": "pkgs-neovim",
         "pkgsunstable": "pkgsunstable",
         "worktrunk": "worktrunk",
         "zellij": "zellij",
