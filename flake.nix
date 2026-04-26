@@ -33,10 +33,6 @@
       url = "github:rgodha24/ghfs";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
-    worktrunk = {
-      url = "github:max-sixty/worktrunk";
-      inputs.nixpkgs.follows = "pkgsunstable";
-    };
     lumen = {
       url = "github:rgodha24/lumen";
     };
@@ -53,7 +49,6 @@
     opencode,
     zellij,
     ghfs,
-    worktrunk,
     lumen,
     ...
   }: let
@@ -104,7 +99,6 @@
               inherit fenixPkgs;
               inherit opencode;
               inherit zellij;
-              inherit worktrunk;
               inherit lumen;
               inherit neovim-pin;
             };
@@ -123,7 +117,6 @@
         unstable = unstableFor darwinSystem;
         inherit opencode;
         inherit zellij;
-        inherit worktrunk;
         inherit lumen;
         neovim-pin = (import pkgs-neovim {
           system = darwinSystem;

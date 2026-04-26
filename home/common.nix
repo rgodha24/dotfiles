@@ -5,7 +5,6 @@
   opencode,
   system,
   zellij,
-  worktrunk,
   lumen,
   neovim-pin,
   ...
@@ -198,7 +197,7 @@ in {
       unzip
       btop
       zellij.packages.${system}.default
-      worktrunk.packages.${system}.default
+      ncdu
       lumen.packages.${system}.default
 
       cachix
@@ -218,10 +217,8 @@ in {
       starship
       fish
       neovim-pin
-      unstable.vscode
       unstable.code-cursor
       unstable.zed
-      unstable.antigravity
 
       opencode.packages.${system}.default
       unstable.codex

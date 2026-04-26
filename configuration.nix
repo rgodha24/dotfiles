@@ -164,9 +164,14 @@
   hardware.nvidia-container-toolkit.enable = true;
 
   # Global dark theme
+  # SSL_*: third-party Pythons (e.g. uv) link OpenSSL with defaults that expect
+  # /etc/ssl/cert.pem; NixOS only exposes the bundle under cacert. Without this,
+  # urllib/requests in those interpreters fail with CERTIFICATE_VERIFY_FAILED.
   environment.variables = {
     GTK_THEME = "Adwaita:dark";
     QT_STYLE_OVERRIDE = "adwaita-dark";
+    SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
   };
 
   qt = {
