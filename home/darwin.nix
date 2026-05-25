@@ -12,5 +12,8 @@
     kitty
     rustup
     pkgconf
+
+    openconnect
+    vpn-slice
   ];
 }

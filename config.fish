@@ -2,6 +2,7 @@
 set -l path_extra "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin"
 if test (uname) = "Darwin"
   set -a path_extra "/Applications/Tailscale.app/Contents/MacOS/"
+  set -a path_extra (dirname (xcrun -find metal) 2>/dev/null)
 end
 set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH $path_extra
 
