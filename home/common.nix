@@ -6,6 +6,8 @@
   system,
   zellij,
   lumen,
+  claude-code-nix,
+  codex-cli-nix,
   neovim-pin,
   ...
 }: let
@@ -221,8 +223,8 @@ in {
       unstable.zed
 
       opencode.packages.${system}.default
-      unstable.codex
-      unstable.claude-code
+      codex-cli-nix.packages.${system}.default
+      claude-code-nix.packages.${system}.default
 
       unstable.prettierd
       stylua

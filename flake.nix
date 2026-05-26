@@ -23,7 +23,6 @@
     };
     opencode = {
       url = "github:rgodha24/opencode";
-      inputs.nixpkgs.follows = "pkgsunstable";
     };
     zellij = {
       url = "github:rgodha24/zellij";
@@ -35,6 +34,14 @@
     };
     lumen = {
       url = "github:rgodha24/lumen";
+    };
+    claude-code-nix = {
+      url = "github:sadjow/claude-code-nix";
+      inputs.nixpkgs.follows = "pkgsunstable";
+    };
+    codex-cli-nix = {
+      url = "github:sadjow/codex-cli-nix";
+      inputs.nixpkgs.follows = "pkgsunstable";
     };
   };
 
@@ -50,6 +57,8 @@
     zellij,
     ghfs,
     lumen,
+    claude-code-nix,
+    codex-cli-nix,
     ...
   }: let
     linuxSystem = "x86_64-linux";
@@ -65,14 +74,15 @@
         config.allowUnfree = true;
       };
     unstable = unstableFor linuxSystem;
-    neovim-pin = (import pkgs-neovim {
-      system = linuxSystem;
-      config.allowUnfree = true;
-    }).neovim;
+    neovim-pin =
+      (import pkgs-neovim {
+        system = linuxSystem;
+        config.allowUnfree = true;
+      }).neovim;
     fenixPkgs = fenix.packages.${linuxSystem};
   in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-      specialArgs = { inherit unstable; };
+      specialArgs = {inherit unstable;};
       system = linuxSystem;
       modules = [
         determinate.nixosModules.default
@@ -100,6 +110,8 @@
               inherit opencode;
               inherit zellij;
               inherit lumen;
+              inherit claude-code-nix;
+              inherit codex-cli-nix;
               inherit neovim-pin;
             };
           };
@@ -118,10 +130,13 @@
         inherit opencode;
         inherit zellij;
         inherit lumen;
-        neovim-pin = (import pkgs-neovim {
-          system = darwinSystem;
-          config.allowUnfree = true;
-        }).neovim;
+        inherit claude-code-nix;
+        inherit codex-cli-nix;
+        neovim-pin =
+          (import pkgs-neovim {
+            system = darwinSystem;
+            config.allowUnfree = true;
+          }).neovim;
       };
       modules = [
         ghfs.homeManagerModules.default
