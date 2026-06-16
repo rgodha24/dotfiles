@@ -127,6 +127,7 @@
       extraSpecialArgs = {
         system = darwinSystem;
         unstable = unstableFor darwinSystem;
+        username = "rohangodha";
         inherit opencode;
         inherit zellij;
         inherit lumen;
@@ -142,6 +143,31 @@
         ghfs.homeManagerModules.default
         ./home/common.nix
         ./home/darwin.nix
+      ];
+    };
+
+    homeConfigurations.work = home-manager.lib.homeManagerConfiguration {
+      pkgs = pkgsFor darwinSystem;
+      extraSpecialArgs = {
+        system = darwinSystem;
+        unstable = unstableFor darwinSystem;
+        username = "rgodha";
+        inherit opencode;
+        inherit zellij;
+        inherit lumen;
+        inherit claude-code-nix;
+        inherit codex-cli-nix;
+        neovim-pin =
+          (import pkgs-neovim {
+            system = darwinSystem;
+            config.allowUnfree = true;
+          }).neovim;
+      };
+      modules = [
+        ghfs.homeManagerModules.default
+        ./home/common.nix
+        ./home/darwin.nix
+        ./home/work.nix
       ];
     };
   };
