@@ -126,6 +126,7 @@ in {
 
   programs.lazygit = {
     enable = true;
+    package = unstable.lazygit;
     settings = {
       git = {
         overrideGpg = true;
@@ -183,7 +184,6 @@ in {
     (with pkgs; [
       ripgrep
       eza
-      lazygit
       gh
       git
       bat
