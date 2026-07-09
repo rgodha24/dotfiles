@@ -184,7 +184,7 @@ in {
     (with pkgs; [
       ripgrep
       eza
-      gh
+      unstable.gh
       git
       bat
       zoxide

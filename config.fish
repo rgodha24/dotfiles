@@ -40,6 +40,9 @@ if test (uname) = "Linux"
   set -x LD_LIBRARY_PATH "$HOME/.nix-profile/lib" "$HOME/.nix-profile/lib64" $LD_LIBRARY_PATH
 end
 
+# claude shit
+set -x CLAUDE_CODE_DISABLE_AUTO_MEMORY 1
+
 function gc 
   echo "pruning nix store"
   nix store gc

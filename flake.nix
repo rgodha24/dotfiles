@@ -22,7 +22,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     opencode = {
-      url = "github:rgodha24/opencode";
+      url = "github:anomalyco/opencode";
     };
     zellij = {
       url = "github:rgodha24/zellij";
