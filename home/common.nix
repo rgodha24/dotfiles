@@ -4,11 +4,11 @@
   unstable,
   opencode,
   system,
-  zellij,
   lumen,
   claude-code-nix,
   codex-cli-nix,
   neovim-pin,
+  herdr,
   ...
 }: let
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
@@ -144,7 +144,7 @@ in {
   home.file.".config/starship.toml".source = ../starship.toml;
   home.file.".config/ghostty/config".source = ../ghostty.config;
   home.file.".config/cryptenv.toml".source = ../cryptenv.toml;
-  home.file.".config/zellij/config.kdl".source = ../zellij.kdl;
+  home.file.".config/herdr/config.toml".source = ../herdr.toml;
   home.file.".config/opencode/opencode.jsonc".source = ../opencode/config.json5;
 
   # works for everything EXCEPT claude code.
@@ -198,7 +198,6 @@ in {
       htop
       unzip
       btop
-      zellij.packages.${system}.default
       ncdu
       lumen.packages.${system}.default
 
@@ -225,6 +224,7 @@ in {
       opencode.packages.${system}.default
       codex-cli-nix.packages.${system}.default
       claude-code-nix.packages.${system}.default
+      herdr.packages.${system}.default
 
       unstable.prettierd
       stylua

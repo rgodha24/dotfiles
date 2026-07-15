@@ -1,0 +1,27 @@
+onboarding = false
+
+[keys]
+prefix = "ctrl+i"
+previous_workspace = "cmd+k"
+next_workspace = "cmd+j"
+previous_agent = "cmd+shift+k"
+next_agent = "cmd+shift+j"
+open_worktree = "prefix+shift+o"
+switch_tab = ["prefix+1..9", "alt+1..9"]
+
+new_tab = ["prefix+c", "super+t"]
+previous_tab = ["prefix+p", "alt+p"]
+next_tab = ["prefix+n", "alt+n"]
+rename_tab = ["prefix+shift+t", "alt+r"]
+
+split_vertical = ["prefix+v", "alt+d"]
+split_horizontal = ["prefix+minus", "alt+shift+d"]
+
+focus_pane_left = ["prefix+h", "alt+h"]
+focus_pane_down = ["prefix+j", "alt+j"]
+focus_pane_up = ["prefix+k", "alt+k"]
+focus_pane_right = ["prefix+l", "alt+l"]
+
+close_pane = ["prefix+x", "alt+w"]
+copy_mode = ["prefix+[", "alt+s"]
+detach = ["prefix+q", "alt+q"]

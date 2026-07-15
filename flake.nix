@@ -24,10 +24,6 @@
     opencode = {
       url = "github:anomalyco/opencode";
     };
-    zellij = {
-      url = "github:rgodha24/zellij";
-      inputs.nixpkgs.follows = "pkgsunstable";
-    };
     ghfs = {
       url = "github:rgodha24/ghfs";
       inputs.nixpkgs.follows = "pkgsunstable";
@@ -43,6 +39,10 @@
       url = "github:sadjow/codex-cli-nix";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
+    herdr = {
+      url = "github:ogulcancelik/herdr";
+      inputs.nixpkgs.follows = "pkgsunstable";
+    };
   };
 
   outputs = {
@@ -54,11 +54,11 @@
     zen-browser,
     fenix,
     opencode,
-    zellij,
     ghfs,
     lumen,
     claude-code-nix,
     codex-cli-nix,
+    herdr,
     ...
   }: let
     linuxSystem = "x86_64-linux";
@@ -108,11 +108,11 @@
               system = linuxSystem;
               inherit fenixPkgs;
               inherit opencode;
-              inherit zellij;
               inherit lumen;
               inherit claude-code-nix;
               inherit codex-cli-nix;
               inherit neovim-pin;
+              inherit herdr;
             };
           };
 
@@ -129,10 +129,10 @@
         unstable = unstableFor darwinSystem;
         username = "rohangodha";
         inherit opencode;
-        inherit zellij;
         inherit lumen;
         inherit claude-code-nix;
         inherit codex-cli-nix;
+        inherit herdr;
         neovim-pin =
           (import pkgs-neovim {
             system = darwinSystem;
@@ -153,10 +153,10 @@
         unstable = unstableFor darwinSystem;
         username = "rgodha";
         inherit opencode;
-        inherit zellij;
         inherit lumen;
         inherit claude-code-nix;
         inherit codex-cli-nix;
+        inherit herdr;
         neovim-pin =
           (import pkgs-neovim {
             system = darwinSystem;

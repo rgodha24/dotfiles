@@ -2,6 +2,8 @@
 set -l path_extra "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin"
 if test (uname) = "Darwin"
   set -a path_extra "/Applications/Tailscale.app/Contents/MacOS/"
+end
+if test (uname) = "Darwin"; and test (whoami) = "rgodha"
   set -a path_extra (dirname (xcrun -find metal) 2>/dev/null)
 end
 set -x PATH "$HOME/.nix-profile/bin/" "/nix/var/nix/profiles/default/bin/" $PATH $path_extra
@@ -85,36 +87,4 @@ end
 
 function oc 
   cryptenv run ai -- opencode $argv
-end
-
-function za
-  set -l session_name $argv[1]
-  set -l sessions (zellij list-sessions -s 2>/dev/null)
-
-  # if exact match exists, attach directly
-  if contains -- $session_name $sessions
-    zellij a $session_name
-    return
-  end
-
-  # build fzf input: user's session name (if provided) + existing sessions
-  set -l fzf_input
-  if test -n "$session_name"
-    set fzf_input $session_name
-  end
-  set -a fzf_input $sessions
-
-  # dedupe and run fzf
-  set -l selected (printf '%s\n' $fzf_input | sort -u | fzf --prompt="zellij session: ")
-
-  if test -z "$selected"
-    return 1
-  end
-
-  # attach if session exists, otherwise create it
-  if contains -- $selected $sessions
-    zellij a $selected
-  else
-    zellij -s $selected
-  end
 end
