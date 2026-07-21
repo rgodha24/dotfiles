@@ -43,6 +43,10 @@
       url = "github:ogulcancelik/herdr";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
+    pi = {
+      url = "github:lukasl-dev/pi.nix";
+      inputs.nixpkgs.follows = "pkgsunstable";
+    };
   };
 
   outputs = {
@@ -59,6 +63,7 @@
     claude-code-nix,
     codex-cli-nix,
     herdr,
+    pi,
     ...
   }: let
     linuxSystem = "x86_64-linux";
@@ -82,43 +87,30 @@
     fenixPkgs = fenix.packages.${linuxSystem};
   in {
     nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-      specialArgs = {inherit unstable;};
+      specialArgs = {inherit unstable home-manager;};
       system = linuxSystem;
       modules = [
         determinate.nixosModules.default
         ./configuration.nix
-        home-manager.nixosModules.home-manager
         {
           nixpkgs.config.allowUnfree = true;
-          home-manager = {
-            useGlobalPkgs = true;
-            useUserPackages = true;
-            backupFileExtension = "backup";
-            sharedModules = [ghfs.homeManagerModules.default];
-            users.rgodha = {
-              imports = [
-                zen-browser.homeModules.beta
-                ./home.nix
-              ];
-            };
-            extraSpecialArgs = {
-              inherit zen-browser;
-              inherit unstable;
-              inherit pkgsunstable;
-              system = linuxSystem;
-              inherit fenixPkgs;
-              inherit opencode;
-              inherit lumen;
-              inherit claude-code-nix;
-              inherit codex-cli-nix;
-              inherit neovim-pin;
-              inherit herdr;
-            };
-          };
 
           programs.nix-ld.enable = true;
           programs.nix-ld.package = unstable.nix-ld;
         }
+      ];
+    };
+
+    homeConfigurations.nixos = home-manager.lib.homeManagerConfiguration {
+      pkgs = pkgsFor linuxSystem;
+      extraSpecialArgs = {
+        inherit unstable pkgsunstable fenixPkgs opencode lumen claude-code-nix codex-cli-nix herdr pi zen-browser neovim-pin;
+        system = linuxSystem;
+      };
+      modules = [
+        ghfs.homeManagerModules.default
+        zen-browser.homeModules.beta
+        ./home.nix
       ];
     };
 
@@ -133,6 +125,7 @@
         inherit claude-code-nix;
         inherit codex-cli-nix;
         inherit herdr;
+        inherit pi;
         neovim-pin =
           (import pkgs-neovim {
             system = darwinSystem;
@@ -157,6 +150,7 @@
         inherit claude-code-nix;
         inherit codex-cli-nix;
         inherit herdr;
+        inherit pi;
         neovim-pin =
           (import pkgs-neovim {
             system = darwinSystem;

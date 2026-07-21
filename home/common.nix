@@ -9,6 +9,7 @@
   codex-cli-nix,
   neovim-pin,
   herdr,
+  pi,
   ...
 }: let
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
@@ -182,6 +183,21 @@ in {
   home.file.".config/cryptenv.toml".source = ../cryptenv.toml;
   home.file.".config/herdr/config.toml".source = ../herdr.toml;
   home.file.".config/opencode/opencode.jsonc".source = ../opencode/config.json5;
+
+  imports = [pi.homeModules.default];
+  programs.pi.coding-agent = {
+    enable = true;
+    settings = {
+      defaultProvider = "opencode-go";
+      defaultModel = "glm-5.2";
+      defaultThinkingLevel = "high";
+      hideThinkingBlock = false;
+      theme = "dark";
+    };
+  };
+
+  home.file.".pi/agent/extensions".source = ../pi/extensions;
+  home.file.".pi/agent/keybindings.json".source = ../pi/keybindings.json;
 
   # works for everything EXCEPT claude code.
   # fuck claude code.

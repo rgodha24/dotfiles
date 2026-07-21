@@ -5,6 +5,7 @@
   config,
   pkgs,
   unstable,
+  home-manager,
   ...
 }: {
   imports = [
@@ -31,16 +32,19 @@
   # cachix stuff
   nix.settings.trusted-users = ["root" "rgodha"];
 
-  # NVIDIA CUDA binary caches
   nix.settings.substituters = [
     "https://cache.nixos.org"
     "https://cuda-maintainers.cachix.org"
     "https://cache.nixos-cuda.org"
+    "https://pi.cachix.org"
+    "https://nix-community.cachix.org"
   ];
   nix.settings.trusted-public-keys = [
     "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
     "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
     "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
+    "pi.cachix.org-1:lGeoGJaZ5ZDabuRzkcD5EBTNnDM4HJ1vqeOxlWk1Flk="
+    "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
   ];
 
   networking.hostName = "nixos"; # Define your hostname.
@@ -131,24 +135,26 @@
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
-  environment.systemPackages = with pkgs; [
-    neovim
-    wget
-    curl
-    gcc
-    openssl
-    stdenv.cc.cc.lib
-    adwaita-qt
-    adwaita-qt6
-    xorg.xauth
-    xorg.xhost
-    xorg.xclock
-    xorg.xeyes
-    tailscale
-    unstable.cudaPackages_13.cudatoolkit
-    unstable.cudaPackages_13.libcublas
-    unstable.cudaPackages_13.cudnn
-  ];
+  environment.systemPackages =
+    (with pkgs; [
+      neovim
+      wget
+      curl
+      gcc
+      openssl
+      stdenv.cc.cc.lib
+      adwaita-qt
+      adwaita-qt6
+      xorg.xauth
+      xorg.xhost
+      xorg.xclock
+      xorg.xeyes
+      tailscale
+      unstable.cudaPackages_13.cudatoolkit
+      unstable.cudaPackages_13.libcublas
+      unstable.cudaPackages_13.cudnn
+    ])
+    ++ [home-manager.packages.${pkgs.stdenv.hostPlatform.system}.home-manager];
 
   programs.hyprland.enable = true;
   programs.fish.enable = true;
