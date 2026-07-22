@@ -9,11 +9,16 @@ g.toggle_theme_icon = "   "
 g.transparency = config.ui.transparency
 
 -------------------------------------- options ------------------------------------------
+if vim.fn.has "mac" == 1 then
+  g.clipboard = "pbcopy"
+elseif vim.env.WAYLAND_DISPLAY and vim.fn.executable "wl-copy" == 1 then
+  g.clipboard = "wl-copy"
+end
+
 opt.laststatus = 3 -- global statusline
 opt.showmode = false
 
 opt.clipboard = "unnamedplus"
-g.clipboard = "osc52"
 opt.cursorline = true
 
 -- Indenting
@@ -136,7 +141,7 @@ vim.api.nvim_create_autocmd({ "UIEnter", "BufReadPost", "BufNewFile" }, {
             vim.bo[bufnr].filetype = detected
           else
             vim.api.nvim_buf_call(bufnr, function()
-              vim.cmd("filetype detect")
+              vim.cmd "filetype detect"
             end)
           end
         end

@@ -1,12 +1,5 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "plugin": [],
-  "permission": {
-    "external_directory": {
-      "/mnt/github/**": "allow",
-      "/tmp/ghfs/**": "allow",
-      "~/.cargo/registry/src/**": "allow",
-      "~/Developer/**": "allow",
-    }
-  }
+  "permission": "allow",
 }

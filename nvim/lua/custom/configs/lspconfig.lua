@@ -38,4 +38,4 @@ vim.lsp.config("astro", {
   },
 })
 
-vim.lsp.enable("astro")
+vim.lsp.enable "astro"

@@ -53,6 +53,42 @@
     }
     else throw "Unsupported system: ${system}";
 
+  opencodePkg = opencode.packages.${system}.opencode.override {
+    node_modules = opencode.packages.${system}.node_modules_updater.override {
+      hash = {
+        aarch64-darwin = "sha256-JybXudo6bc6Z10BQNPtiJg5YZGn/ohdMogb1FGctnm4=";
+        aarch64-linux = "sha256-XW0XZnsCRkU3MFJH9TjMRYZHffzVy3cQyiNCkec2gl4=";
+        x86_64-darwin = "sha256-sBdQPkzd7JXNW6Lbi9JHiAsfHwdLwTKWY+uPeXAv2Nw=";
+        x86_64-linux = "sha256-F1luclnqCPQk9yxfmeSYGaM/nScf28yBu9K3Fv+Xd24=";
+      }.${system};
+    };
+  };
+
+  opencode2Pkg = opencodePkg.overrideAttrs (old: {
+    pname = "opencode2";
+    buildPhase = ''
+      runHook preBuild
+
+      cd ./packages/cli
+      bun --bun ./script/build.ts --single --skip-install
+
+      runHook postBuild
+    '';
+    installPhase = ''
+      runHook preInstall
+
+      install -Dm755 dist/cli-*/bin/opencode2 $out/bin/opencode2
+
+      wrapProgram $out/bin/opencode2 \
+        --prefix PATH : ${pkgs.lib.makeBinPath ([pkgs.ripgrep] ++ pkgs.lib.optional pkgs.stdenvNoCC.hostPlatform.isDarwin pkgs.unixtools.sysctl)}
+
+      runHook postInstall
+    '';
+    postInstall = "";
+    doInstallCheck = false;
+    meta = old.meta // {mainProgram = "opencode2";};
+  });
+
   cursorAgentPkg = pkgs.stdenv.mkDerivation {
     pname = "cursor-agent";
     version = cursorAgentVersion;
@@ -221,7 +257,8 @@ in {
       unstable.code-cursor
       unstable.zed
 
-      opencode.packages.${system}.default
+      opencodePkg
+      opencode2Pkg
       codex-cli-nix.packages.${system}.default
       claude-code-nix.packages.${system}.default
       herdr.packages.${system}.default
