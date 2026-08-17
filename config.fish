@@ -33,6 +33,7 @@ alias config="nvim ~/dotfiles/flake.nix && nixup"
 alias where="which"
 alias n="nvim ."
 alias t="eza -T --git-ignore"
+alias devcloud="bun $HOME/Developer/devcloud/src/cli/index.ts"
 if test (uname) = "Linux"
   alias reboot-windows='sudo bootctl set-oneshot auto-windows && sudo reboot'
 
@@ -69,6 +70,7 @@ function nixup
     end
   else
     sudo nixos-rebuild switch --flake ~/dotfiles#nixos
+    and home-manager switch -b backup --flake ~/dotfiles#nixos
   end
 end
 
