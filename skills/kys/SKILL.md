@@ -11,6 +11,7 @@ Wind the session down completely, then close the pane this agent lives in. Closi
 ## 1. Stop what this session started
 
 - Stop background tasks started this session: dev servers, file watchers, http servers, tunnels.
+- If this session made a **tesser** box (e.g. via the wt skill), `tesser rm <box_id>` it — the box is throwaway per-worktree compute, and the local worktree/commits are unaffected. `tesser ls` finds a box whose id was lost.
 - Close headless browsers or drivers spawned for screenshots/tests.
 - Verify nothing is left: check the ports and process names this session used (`pgrep -af`, `curl` the ports). Kill only processes this session started — never ones the user runs themselves; check the command line and port before killing anything.
 

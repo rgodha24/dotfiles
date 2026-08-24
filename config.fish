@@ -1,5 +1,5 @@
 # prefer things in nix-profile over default installs
-set -l path_extra "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin"
+set -l path_extra "$HOME/.cargo/bin/" "$HOME/.bun/bin/" "$HOME/.sst/bin/" "$HOME/.local/bin" "$HOME/go/bin" "$HOME/.tesser/bin"
 if test (uname) = "Darwin"
   set -a path_extra "/Applications/Tailscale.app/Contents/MacOS/"
 end
@@ -33,7 +33,6 @@ alias config="nvim ~/dotfiles/flake.nix && nixup"
 alias where="which"
 alias n="nvim ."
 alias t="eza -T --git-ignore"
-alias devcloud="bun $HOME/Developer/devcloud/src/cli/index.ts"
 if test (uname) = "Linux"
   alias reboot-windows='sudo bootctl set-oneshot auto-windows && sudo reboot'
 
