@@ -22,10 +22,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     opencode = {
-      url = "github:anomalyco/opencode/v2";
+      # v2 currently has a broken flake: it references packages/opencode,
+      # which is absent from the branch source.
+      url = "github:anomalyco/opencode/98c2907";
     };
     ghfs = {
       url = "github:rgodha24/ghfs";
+      inputs.nixpkgs.follows = "pkgsunstable";
+    };
+    docfs = {
+      url = "github:rgodha24/docfs";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
     lumen = {
@@ -59,6 +65,7 @@
     fenix,
     opencode,
     ghfs,
+    docfs,
     lumen,
     claude-code-nix,
     codex-cli-nix,
@@ -104,7 +111,7 @@
     homeConfigurations.nixos = home-manager.lib.homeManagerConfiguration {
       pkgs = pkgsFor linuxSystem;
       extraSpecialArgs = {
-        inherit unstable pkgsunstable fenixPkgs opencode lumen claude-code-nix codex-cli-nix herdr pi zen-browser neovim-pin;
+        inherit unstable pkgsunstable fenixPkgs opencode ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi zen-browser neovim-pin;
         system = linuxSystem;
       };
       modules = [
@@ -121,6 +128,8 @@
         unstable = unstableFor darwinSystem;
         username = "rohangodha";
         inherit opencode;
+        inherit ghfs;
+        inherit docfs;
         inherit lumen;
         inherit claude-code-nix;
         inherit codex-cli-nix;
@@ -146,6 +155,8 @@
         unstable = unstableFor darwinSystem;
         username = "rgodha";
         inherit opencode;
+        inherit ghfs;
+        inherit docfs;
         inherit lumen;
         inherit claude-code-nix;
         inherit codex-cli-nix;
