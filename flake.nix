@@ -9,11 +9,6 @@
       url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    zen-browser = {
-      url = "github:0xc000022070/zen-browser-flake";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.home-manager.follows = "home-manager";
-    };
     pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
     # pinned for neovim 0.11 until plugins are compatible with 0.12
     pkgs-neovim.url = "github:NixOS/nixpkgs/2fc6539b481e1d2569f25f8799236694180c0993";
@@ -22,9 +17,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     opencode = {
-      # v2 currently has a broken flake: it references packages/opencode,
-      # which is absent from the branch source.
-      url = "github:anomalyco/opencode/98c2907";
+      # v2 includes PR #43469 (feat(nix): update cli packaging), which fixed
+      # node_modules.nix filtering the renamed-away `packages/opencode`.
+      url = "github:anomalyco/opencode/v2";
     };
     ghfs = {
       url = "github:rgodha24/ghfs";
@@ -61,7 +56,6 @@
     pkgs-neovim,
     home-manager,
     determinate,
-    zen-browser,
     fenix,
     opencode,
     ghfs,
@@ -111,12 +105,11 @@
     homeConfigurations.nixos = home-manager.lib.homeManagerConfiguration {
       pkgs = pkgsFor linuxSystem;
       extraSpecialArgs = {
-        inherit unstable pkgsunstable fenixPkgs opencode ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi zen-browser neovim-pin;
+        inherit unstable pkgsunstable fenixPkgs opencode ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi neovim-pin;
         system = linuxSystem;
       };
       modules = [
         ghfs.homeManagerModules.default
-        zen-browser.homeModules.beta
         ./home.nix
       ];
     };

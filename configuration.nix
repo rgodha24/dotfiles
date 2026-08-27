@@ -56,6 +56,7 @@
 
   # Enable networking
   networking.networkmanager.enable = true;
+  networking.enableIPv6 = false;
   networking.interfaces.enp13s0f3u1c2 = {
     useDHCP = false;
     ipv4.addresses = [
