@@ -19,7 +19,8 @@ Wind the session down completely, then close the pane this agent lives in. Closi
 
 If the session created throwaway state purely for its own verification — seeded test users, database rows, preview deploys — delete it now.
 
-Leave real work products alone: code changes, worktrees, commits, screenshots, artifacts. If in a worktree session, exit it with **keep**, never remove.
+Leave real work products alone: code changes, worktrees, commits, screenshots, artifacts. If in a worktree session, make sure everything is committed on your branch.
+then, delete your worktree directory entirely. also if you created a herdr worktree/session, delete the whole session (not just your pane!)
 
 ## 3. Report, then close the pane
 

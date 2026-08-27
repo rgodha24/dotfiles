@@ -20,9 +20,11 @@ Idle boxes sleep (workbench after 10 minutes, instance box after 2 hours); a
 box asleep for 16 hours is removed. Any command that targets a sleeping box
 wakes it (about a minute). `tesser ls` finds a box whose id you lost.
 
-Boxes run Ubuntu 24.04 with Node 22 and rsync installed at boot. Nothing else
-is promised: check with `tesser exec -- which pnpm` and install what you need
-with `exec`. The `ubuntu` user has no sudo, so install user-level.
+Boxes run Ubuntu 24.04 with Node 22, rsync, and Docker (compose included)
+baked into the image. The `ubuntu` user has passwordless sudo and is in the
+docker group, so `sudo apt-get install`, `docker compose up`, and the repo's
+existing container setup all just work. Anything else: check with
+`tesser exec -- which pnpm` and install it with `exec`.
 
 ## Setup (once per laptop)
 
@@ -45,7 +47,7 @@ an owner runs `tesser member add <email>`; the next `tesser login` offers it.
 
 Contracts: commands that create or select print the `box_…` id as their ONLY
 stdout (progress goes to stderr). `exec` and `logs` pass the remote exit code
-through. Read commands take `--json`. `stop` and `rm` never confirm.
+through. Read commands take `--json`. `rm` never confirms.
 
 - `tesser make [service]` — new box. No service: a workbench. With a service
   (a manifest name): an instance box. Claims a prewarmed pool box in seconds
@@ -55,16 +57,18 @@ through. Read commands take `--json`. `stop` and `rm` never confirm.
   with its code. No box id: the worktree's workbench (created on first use).
   `--in` runs in that service's root; `--deps-of` wires that service's dep
   ports for the run. Use it for setup: `tesser exec -- pnpm install`.
-- `tesser dev <service>` — box for (worktree, service), sync, `setup` if
-  needed, start the manifest's `dev` recipe under the box supervisor, wait
-  until its port listens, register it with the proxy. Prints the box id.
-  Re-running replaces the server; that is also how to recover a crash.
+- `tesser dev <service>` — box for (worktree, service), sync, run the
+  manifest's `setup` then `dev` recipe under the box supervisor, wait until
+  its primary port listens, register it with the proxy. Prints the box id.
+  If setup or the server exits before the port listens, it prints the log
+  tail and exits 1 (`--detach` skips the wait). Re-running replaces the
+  server; that is also how to recover a crash.
   `tesser dev <box_id> -- <cmd…>` runs an explicit command instead of the
   recipe (it must listen on box port 3000 when there is no manifest).
 - `tesser sync <box_id> [--restart]` — push local edits without running
   anything; the dev server's HMR picks them up. `--restart` then re-runs the
-  manifest's dev recipe (even if nothing changed) for changes the server
-  cannot hot-absorb. `exec` and `dev` sync implicitly.
+  manifest's `setup` and `dev` recipes (even if nothing changed) for changes
+  the server cannot hot-absorb, a new dependency included. `exec` and `dev` sync implicitly.
 - `tesser env push <box_id> [file…]` — send gitignored env files (default:
   every `.env*` at the worktree root that git ignores). `sync` respects
   .gitignore, so `.env.local` never arrives on its own unless the manifest
@@ -75,15 +79,18 @@ through. Read commands take `--json`. `stop` and `rm` never confirm.
   `env ls <service>` — values the control plane injects into that service's
   pinned instances.
 - `tesser logs <box_id> [-f]` — dev server output (last 200 lines / follow).
-- `tesser stop <box_id>` — stop the dev server and deregister the box from
-  the proxy; the box stays awake.
+  Current run only: each `dev` starts a fresh log, the previous run is at
+  `~/.tesser/dev.log.1` on the box.
 - `tesser ls` / `tesser status <box_id>` — boxes, class, service, power,
   presence, public IP.
+- `tesser usage` — the org's compute meter and remaining beta credit.
 - `tesser use <box_id>` — point localhost:3000 at this box. Only when the
   user asks; they usually switch themselves.
 - `tesser sleep <box_id>` — power off now (disk and id persist).
 - `tesser ssh <box_id> [-- <cmd…>]` — interactive shell, or one command in
-  `~/workspace`, for inspection only (no sync first).
+  `~/workspace`, for inspection only (no sync first). For `ssh`, `exec`, and
+  `dev` overrides, everything after `--` is exact argv — no shell parses it,
+  so `-- "a; b"` looks for a program named `a; b`; use `-- bash -c 'a && b'`.
 - `tesser rm <box_id>` — the box is gone for good.
 - `tesser pool fill [N]` / `pool ls` / `pool drain` — prewarm blanks so
   `make` is instant; unclaimed pool boxes self-destruct after an hour.
@@ -97,14 +104,15 @@ A service is a TOML file at `.claude/skills/tesser/<service>.toml` (the file
 name is the service name, org-global):
 
 ```toml
-ports = [3000]
+ports = [3000]        # several allowed: ports = [5432, 6379]; first = primary
 
 [run]
 setup = "pnpm install"
 dev   = "pnpm dev"
 
 [deps]
-5001 = "backend"      # localhost:5001 on this box reaches backend
+5001 = "backend"      # localhost:5001 on this box reaches backend's primary port
+9091 = "search:9090"  # a specific port of a dependency
 ```
 
 Deps are loopback ports on the box, so the app keeps its `localhost:…`
@@ -130,6 +138,11 @@ Without a manifest: `BOX=$(tesser make)`, `tesser exec "$BOX" -- pnpm install`,
 
 ## Warnings
 
+- Declared ports may be bound on `127.0.0.1` or `0.0.0.0` — either works, and
+  an all-interfaces bind is not public: other boxes reach declared ports only
+  through the box's mesh ingress. Pin the port in the dev server's config so
+  a collision fails loudly instead of drifting to the next port and breaking
+  routing.
 - Never edit files on the box: the next sync overwrites remote changes with
   the local worktree. `ssh` is for looking, not editing.
 - The box's repo is a shallow mirror of the worktree's HEAD. `git status`,
@@ -139,8 +152,8 @@ Without a manifest: `BOX=$(tesser make)`, `tesser exec "$BOX" -- pnpm install`,
 - One box per worktree. Syncing worktree B to a box made from worktree A
   replaces its whole workspace; a guard aborts obviously wrong syncs. Do not
   `--force` past it — `make` a new box instead.
-- `dev` re-run kills and replaces the running server. `stop` and `rm` never
-  ask; `rm` is unrecoverable.
+- `dev` re-run kills and replaces the running server. `rm` never asks and is
+  unrecoverable.
 
 Human install of this skill: `tesser skill install` (writes
 `~/.claude/skills/tesser/SKILL.md`; `--project` for the repo's
