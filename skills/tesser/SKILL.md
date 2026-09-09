@@ -7,15 +7,20 @@ description: Run dev servers, tests, and heavy commands on persistent cloud boxe
 
 The code stays on the laptop; the compute is a cloud box. tesser mirrors the
 current git worktree to a box's `~/workspace` and runs commands there. The
-human sees whatever is running through `http://localhost:3000` (a local
-proxy run by `tesser daemon`) and switches which box it shows from the panel
-injected into the page, the widget at `http://localhost:4100`, or
-`tesser use <box_id>`. If `localhost:3000` refuses connections, ask the human
-to start `tesser daemon`.
+human sees a box through a local proxy run by `tesser daemon`: every box has
+its own address, `http://<box_id>.localhost:<port>` for each port the
+service declares, and bare `http://localhost:<port>` shows whichever box with
+that port the human focused last from the panel injected into every page (or
+`tesser use <box_id>`); focusing a box never touches ports it does not have.
+If a box address refuses connections, ask the human to start `tesser daemon`.
 
 Each worktree gets its own boxes: a **workbench** for `exec` (tests,
 typechecks, builds) and one **instance box** per service for `dev`. Boxes
 persist until `rm`; a box you made an hour ago still has its node_modules.
+A brand-new box warms its package stores (pnpm/npm/yarn classic+berry/bun/
+cargo/go/uv) from awake org boxes automatically; the first `dev`/`exec` on it
+waits for that copy and prints the result, so a first install is usually
+fast — nothing to do on your side.
 Idle boxes sleep (workbench after 10 minutes, instance box after 2 hours); a
 box asleep for 16 hours is removed. Any command that targets a sleeping box
 wakes it (about a minute). `tesser ls` finds a box whose id you lost.
@@ -31,7 +36,7 @@ existing container setup all just work. Anything else: check with
 ```sh
 curl -fsSL https://tesser.sh/install | sh   # binary in ~/.tesser/bin
 tesser login                                 # browser: sign in or sign up, pick or create an org
-tesser daemon                                # keep running: localhost:3000 + :4100
+tesser daemon                                # keep running: the localhost proxy
 ```
 
 If something else already holds port 3000, `tesser daemon --port 3300`
@@ -49,9 +54,12 @@ Contracts: commands that create or select print the `box_…` id as their ONLY
 stdout (progress goes to stderr). `exec` and `logs` pass the remote exit code
 through. Read commands take `--json`. `rm` never confirms.
 
-- `tesser make [service]` — new box. No service: a workbench. With a service
-  (a manifest name): an instance box. Claims a prewarmed pool box in seconds
-  when one exists, else cold-boots (about 90s). Prints the box id.
+- `tesser make [service] [--size small|standard|large|xlarge]` — new box. No
+  service: a workbench. With a service (a manifest name): an instance box.
+  `--size` picks RAM/CPU (standard = 2 vCPU/8 GB; each step doubles); the
+  service manifest may set a default `size`. Claims a prewarmed pool box in
+  seconds when one exists (standard size only), else cold-boots (about 90s).
+  Prints the box id.
 - `tesser exec [box_id] [--in <service>] [--deps-of <service>] -- <cmd…>` —
   sync the worktree, run the command in `~/workspace`, stream output, exit
   with its code. No box id: the worktree's workbench (created on first use).
@@ -65,6 +73,8 @@ through. Read commands take `--json`. `rm` never confirms.
   server; that is also how to recover a crash.
   `tesser dev <box_id> -- <cmd…>` runs an explicit command instead of the
   recipe (it must listen on box port 3000 when there is no manifest).
+  Deps are not started by `dev`: each resolves to a wire on this box or the
+  org default, so a dep with neither needs `tesser make <dep> --ensure-running <sha>`.
 - `tesser sync <box_id> [--restart]` — push local edits without running
   anything; the dev server's HMR picks them up. `--restart` then re-runs the
   manifest's `setup` and `dev` recipes (even if nothing changed) for changes
@@ -82,21 +92,37 @@ through. Read commands take `--json`. `rm` never confirms.
   Current run only: each `dev` starts a fresh log, the previous run is at
   `~/.tesser/dev.log.1` on the box.
 - `tesser ls` / `tesser status <box_id>` — boxes, class, service, power,
-  presence, public IP.
+  presence, instance, IP. Presence is boxd's socket; instance is whether the
+  dev server is actually up: `none`, `exited`, or `running on :3000 (healthy)`.
+  Trust the instance column, not presence, when deciding whether a service works.
 - `tesser usage` — the org's compute meter and remaining beta credit.
-- `tesser use <box_id>` — point localhost:3000 at this box. Only when the
-  user asks; they usually switch themselves.
+- `tesser cloud status|connect|disconnect|template` — owners only: run the
+  org's boxes in the org's own AWS account. Only when the user asks.
+- `tesser cloud aws-profile <name>` — when ssh fails asking for it: the
+  org's boxes are reached through AWS Session Manager, and this laptop's
+  AWS CLI profile for that account must be named once.
+- `tesser use [--off] <box_id>...` — focus (or unfocus) boxes: bare
+  `localhost:<port>` shows their ports and reaches their deps; other ports
+  stay as they were, so several boxes can be focused at once. Only when
+  the user asks; they usually switch themselves in the panel. `dev` prints
+  the box's own address (`http://<box_id>.localhost:<port>`) — tell the user
+  that one.
 - `tesser sleep <box_id>` — power off now (disk and id persist).
 - `tesser ssh <box_id> [-- <cmd…>]` — interactive shell, or one command in
   `~/workspace`, for inspection only (no sync first). For `ssh`, `exec`, and
   `dev` overrides, everything after `--` is exact argv — no shell parses it,
   so `-- "a; b"` looks for a program named `a; b`; use `-- bash -c 'a && b'`.
 - `tesser rm <box_id>` — the box is gone for good.
+- `tesser service rm <name>` — unregister a service: its pinned shared
+  instances are removed with its default, pins, and env. Dev boxes stay.
 - `tesser pool fill [N]` / `pool ls` / `pool drain` — prewarm blanks so
   `make` is instant; unclaimed pool boxes self-destruct after an hour.
-- `tesser override <box_id> <service> <target_box_id|--clear>` — point one
-  box's dep at a specific box. `--clear` goes back to what auto-wiring would
-  pick: the worktree sibling serving that service, else the org default.
+- `tesser wire <box_id> <service> <target_box_id|--shared>` — point one
+  box's dep at a specific box; `--shared` returns it to the org's shared
+  instance. Bare `tesser wire <box_id>` shows where every dep points.
+  Nothing is ever wired for you: after starting two dev boxes that should
+  talk to each other — same worktree or different repos — wire them
+  (`tesser wire "$WEB" api "$API"`).
 
 ## Manifests
 
@@ -116,16 +142,17 @@ dev   = "pnpm dev"
 ```
 
 Deps are loopback ports on the box, so the app keeps its `localhost:…`
-config. `tesser dev <service>` wires a worktree's sibling services to each
-other and everything else to the org's pinned instances
-(`tesser make <service> --ensure-running <sha>` pins one).
+config. Each dep reaches the box it is wired to (`tesser wire`), else the
+org's pinned shared instance (`tesser make <service> --ensure-running <sha>`
+pins one), else nothing and the port fails loud. Starting a second service's
+box never rewires anything — connect dev boxes with `tesser wire`.
 
 ## Canonical workflow
 
 ```sh
 tesser exec -- pnpm install             # workbench: setup, tests, typechecks
 tesser exec -- pnpm test
-BOX=$(tesser dev frontend)              # instance box; tell the user: open http://localhost:3000
+BOX=$(tesser dev frontend)              # instance box; tell the user: open http://$BOX.localhost:3000
 tesser env push "$BOX"                  # if the app needs .env.local, then re-run dev
 # edit locally, then:
 tesser sync "$BOX"                      # HMR updates their browser
@@ -135,6 +162,34 @@ tesser rm "$BOX"                        # when the worktree is done
 
 Without a manifest: `BOX=$(tesser make)`, `tesser exec "$BOX" -- pnpm install`,
 `tesser dev "$BOX" -- pnpm dev` (listening on 127.0.0.1:3000).
+
+## Wiring topologies
+
+Deps not wired anywhere fall to the org's shared instances, so a
+single-service change needs no wiring at all: `tesser dev web` against the
+shared `api` just works. Everything else is `tesser wire`:
+
+```sh
+# full-stack change (works the same when web and api are different repos —
+# run each dev from its own worktree):
+API=$(tesser dev api)
+WEB=$(tesser dev web)
+tesser wire "$WEB" api "$API"
+
+# backend change, viewed through the frontend at main (frontend repo cloned
+# but untouched): make a worktree of it at origin/main, dev it, wire it back.
+API=$(tesser dev api)                       # in the backend worktree
+git -C ../frontend worktree add /tmp/web-main origin/main
+WEB=$(cd /tmp/web-main && tesser dev web)
+tesser wire "$WEB" api "$API"               # user opens http://$WEB.localhost:3000
+
+tesser wire "$WEB" api --shared             # done: back to the shared api
+```
+
+The org's shared instances' deps never point at anyone's dev box; a personal
+box for that is cheap (above). Direct `<box_id>.localhost:<port>` calls are
+unrestricted in both directions. A wire to a box that is later `rm`'d dangles and
+fails loud — re-wire it or return it to `--shared`.
 
 ## Warnings
 
