@@ -28,7 +28,7 @@ gh pr comment 123 --attach 'PATH/TO/IMAGE#ALT-TEXT'
 If the body already references the file by its local path, gh rewrites that
 reference in place instead of appending a copy at the end. So:
 
-1. Write the body with ordinary local paths, above `### clank`:
+1. Write the body with ordinary local paths, above the clank block:
 
    ```markdown
    works now
@@ -41,8 +41,12 @@ reference in place instead of appending a copy at the end. So:
 
    ![the fixed dialog](./after.png)
 
-   ### clank
+   <details>
+   <summary>clank context (clickme)</summary>
+
    …
+
+   </details>
    ```
 
    Every attachment gets a terse caption on the line before it (a few
@@ -51,7 +55,7 @@ reference in place instead of appending a copy at the end. So:
 
 2. Pass each referenced file with `--attach`. Unreferenced attachments get
    appended to the very end of the body, which would put them *below*
-   `### clank`; always reference them explicitly.
+   the clank block; always reference them explicitly.
 
 Videos render as a player only when the `![](path)` reference is the entire
 paragraph (blank lines around it). Inside a sentence it renders as a link.

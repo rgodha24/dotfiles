@@ -11,7 +11,8 @@ human sees a box through a local proxy run by `tesser daemon`: every box has
 its own address, `http://<box_id>.localhost:<port>` for each port the
 service declares, and bare `http://localhost:<port>` shows whichever box with
 that port the human focused last from the panel injected into every page (or
-`tesser use <box_id>`); focusing a box never touches ports it does not have.
+`tesser use <box_id>`). Selection includes the box’s full dependency graph;
+ports outside that graph keep their previous selection.
 If a box address refuses connections, ask the human to start `tesser daemon`.
 
 Each worktree gets its own boxes: a **workbench** for `exec` (tests,
@@ -46,7 +47,8 @@ Every command runs in one org; `login` makes the org it authorized the
 default. `tesser org ls` lists the orgs this laptop is logged in to,
 `tesser org use <id>` switches, `TESSER_ORG=<id>` overrides for one shell.
 `tesser whoami` shows the signed-in email and org. To join a teammate's org,
-an owner runs `tesser member add <email>`; the next `tesser login` offers it.
+an owner runs `tesser member add <email>`, which emails them; the next
+`tesser login` offers it.
 
 ## Commands
 
@@ -95,24 +97,37 @@ through. Read commands take `--json`. `rm` never confirms.
   presence, instance, IP. Presence is boxd's socket; instance is whether the
   dev server is actually up: `none`, `exited`, or `running on :3000 (healthy)`.
   Trust the instance column, not presence, when deciding whether a service works.
-- `tesser usage` — the org's compute meter and remaining beta credit.
+- `tesser top` — the same, live, as a terminal UI with a wiring graph. For
+  a person at a terminal, never for an agent: it needs a TTY and never exits
+  on its own.
+- `tesser usage --json` — the org's meter: credit left, boxes awake, and awake
+  time by size and service for the last day, week, and all time. Without
+  `--json` in a terminal it is a TUI, for a person, never for an agent.
 - `tesser cloud status|connect|disconnect|template` — owners only: run the
   org's boxes in the org's own AWS account. Only when the user asks.
 - `tesser cloud aws-profile <name>` — when ssh fails asking for it: the
   org's boxes are reached through AWS Session Manager, and this laptop's
   AWS CLI profile for that account must be named once.
-- `tesser use [--off] <box_id>...` — focus (or unfocus) boxes: bare
-  `localhost:<port>` shows their ports and reaches their deps; other ports
-  stay as they were, so several boxes can be focused at once. Only when
-  the user asks; they usually switch themselves in the panel. `dev` prints
-  the box's own address (`http://<box_id>.localhost:<port>`) — tell the user
-  that one.
+- `tesser use [--off] <box_id>...` — select (or remove) boxes and their
+  recursive dependencies on localhost. The latest explicit selection wins
+  within its subtree; select the same box again to reapply its whole graph.
+  `tesser use` reports destinations and availability; `tesser use --json`
+  returns the daemon’s graph and route status. Selection is saved even if
+  the daemon cannot verify it; that command fails with an explanation.
+  Change selection only when the user asks. Give them the fixed box URL
+  printed by `dev`; the panel can select its graph and open localhost.
+  Selection changes laptop routes, never remote wiring or running processes.
+  Re-running `dev` preserves an existing selection’s priority.
 - `tesser sleep <box_id>` — power off now (disk and id persist).
 - `tesser ssh <box_id> [-- <cmd…>]` — interactive shell, or one command in
   `~/workspace`, for inspection only (no sync first). For `ssh`, `exec`, and
   `dev` overrides, everything after `--` is exact argv — no shell parses it,
   so `-- "a; b"` looks for a program named `a; b`; use `-- bash -c 'a && b'`.
 - `tesser rm <box_id>` — the box is gone for good.
+- `tesser service ls` — one line per service: ports, the org's default box
+  (`-` when none), and each pin as `state sha power` or `no pins`. Manifests
+  in this worktree the org has never seen show as `unregistered`. Run it
+  before `dev` when a dep might have no shared instance.
 - `tesser service rm <name>` — unregister a service: its pinned shared
   instances are removed with its default, pins, and env. Dev boxes stay.
 - `tesser pool fill [N]` / `pool ls` / `pool drain` — prewarm blanks so
@@ -144,7 +159,8 @@ dev   = "pnpm dev"
 Deps are loopback ports on the box, so the app keeps its `localhost:…`
 config. Each dep reaches the box it is wired to (`tesser wire`), else the
 org's pinned shared instance (`tesser make <service> --ensure-running <sha>`
-pins one), else nothing and the port fails loud. Starting a second service's
+pins one; `tesser service ls` shows which services have one), else nothing
+and the port fails loud. Starting a second service's
 box never rewires anything — connect dev boxes with `tesser wire`.
 
 ## Canonical workflow
@@ -163,6 +179,34 @@ tesser rm "$BOX"                        # when the worktree is done
 Without a manifest: `BOX=$(tesser make)`, `tesser exec "$BOX" -- pnpm install`,
 `tesser dev "$BOX" -- pnpm dev` (listening on 127.0.0.1:3000).
 
+## Browser-testing a backend change
+
+Deliver a runnable personal dashboard whenever a backend change needs browser
+review, even if no dashboard source changed. A backend box alone is not a
+complete browser test setup.
+
+1. Start or reuse the changed services with `tesser dev` in their worktrees.
+2. Start or reuse a **personal dashboard for this test setup**. In a monorepo,
+   run its service from the same worktree. For a separate frontend repo, use
+   a dedicated main worktree named for the backend branch/setup. Each
+   simultaneous setup needs a different frontend worktree: `dev` reuses by
+   worktree and service, so one shared main worktree would reuse one box.
+3. Explicitly wire that dashboard to the changed backend, and wire changed
+   descendants. Check each box with `tesser wire <box_id>`. If the dashboard
+   and server both use hp, wire both to the intended hp instance; choosing a
+   box on localhost does not make their remote bindings agree.
+4. Leave unchanged dependencies on healthy shared defaults. `ensure-running`
+   creates org defaults; it does not create a personal test dashboard.
+5. Verify the dashboard through its fixed URL and exercise the changed
+   backend path. Check logs/status for all required services, then return
+   the dashboard URL and describe the wiring. Do not present only a backend
+   URL as a browser-ready result.
+
+A dashboard process’s `localhost:5000` binding belongs to that box. Sharing
+one dashboard across B and C cannot give each user different remote wiring.
+Personal dashboards B and C can run identical code with different bindings.
+Unit tests and builds alone do not require launching a dashboard.
+
 ## Wiring topologies
 
 Deps not wired anywhere fall to the org's shared instances, so a
@@ -179,8 +223,8 @@ tesser wire "$WEB" api "$API"
 # backend change, viewed through the frontend at main (frontend repo cloned
 # but untouched): make a worktree of it at origin/main, dev it, wire it back.
 API=$(tesser dev api)                       # in the backend worktree
-git -C ../frontend worktree add /tmp/web-main origin/main
-WEB=$(cd /tmp/web-main && tesser dev web)
+git -C ../frontend worktree add /tmp/web-backend-B origin/main
+WEB=$(cd /tmp/web-backend-B && tesser dev web)
 tesser wire "$WEB" api "$API"               # user opens http://$WEB.localhost:3000
 
 tesser wire "$WEB" api --shared             # done: back to the shared api
@@ -204,11 +248,29 @@ fails loud — re-wire it or return it to `--shared`.
   `diff`, and `rev-parse` behave normally; `git log` shows one commit, and
   any commit or branch made on the box is wiped by the next sync after the
   local HEAD moves. Commit locally, always.
-- One box per worktree. Syncing worktree B to a box made from worktree A
+- One instance box per (worktree, service), plus a workbench. Syncing worktree B to a box made from worktree A
   replaces its whole workspace; a guard aborts obviously wrong syncs. Do not
   `--force` past it — `make` a new box instead.
 - `dev` re-run kills and replaces the running server. `rm` never asks and is
   unrecoverable.
+- `dev` waits on the box's own port, never its deps'. Starting a box in parallel
+  with the infra it depends on lands it against a service that is not up yet;
+  restart it once the dep is listening.
+- A wire reaches the dep port immediately, but an app that started while the dep
+  had nothing behind it can keep a dead connection — redis clients loop on
+  `EPIPE` instead of reconnecting — so restart it after wiring. A manifest edit
+  does not hot-register: after adding a dep, re-run `dev` before `wire` will
+  accept the new name.
+- Every `.toml` in `.claude/skills/tesser/` is read as a service manifest, so an
+  unrelated config file there fails `service ls` for the whole worktree.
+- The recipe runs as `exec <cmd>`, so a `dev` that starts with a shell builtin
+  dies as `exec: set: not found`. Wrap it in a script.
+- Serialize `dev`: several at once trip `Subrequest depth limit exceeded` from
+  the control plane. Retrying works.
+- One command per `ssh` — chained commands often come back empty over SSM.
+- `logs` is a tail; read `~/.tesser/dev.log` on the box for anything cumulative.
+- A local process already bound to a port wins over the box's door silently, so
+  a request meant for the box can land on it instead.
 
 Human install of this skill: `tesser skill install` (writes
 `~/.claude/skills/tesser/SKILL.md`; `--project` for the repo's

@@ -1,12 +1,13 @@
 ---
 name: pr
-description: "Open, edit, or stack a PR the way Rohan does: his voice, his words on top, AI text under a clank heading, draft by default, no Claude trailers. Use whenever asked to make a PR, commit and push, attach a screenshot or video to a PR, or handle review-bot comments."
+description: "Open, edit, or stack a PR the way Rohan does: his voice, his words on top, AI text inside a collapsed clank block, real PR by default, no Claude trailers. Use whenever asked to make a PR, commit and push, attach a screenshot or video to a PR, or handle review-bot comments."
 ---
 
 # pr
 
 The point: a PR should read as Rohan's. Anything an AI wrote is quarantined
-under one `### clank` heading so reviewers know which part to trust as his.
+inside one collapsed `clank context (clickme)` block so reviewers know which
+part to trust as his.
 
 ## Hard rules
 
@@ -30,17 +31,22 @@ under one `### clank` heading so reviewers know which part to trust as his.
   ```
 
   Force-push only if the branch is his and unshared, or he asked.
-- **Everything the AI writes in the body goes under `### clank`**, an H3, the
-  last section of the body, inside a collapsed `<details>` block titled
-  `clank context`. Above it: only Rohan's words and attachments.
+
+- **Everything the AI writes in the body goes inside the clank block**: one
+  collapsed `<details>` with `<summary>clank context (clickme)</summary>`,
+  the last thing in the body. No heading above it. Above the block: only
+  Rohan's words and attachments.
 - **Never ghost-write the human part.** Use his words verbatim when he gave
   any: keep his casing, missing apostrophes, typos, slang. If he gave none,
   ask once for a one-liner. If asking isn't possible, the body starts
-  straight at `### clank`: no empty `## Summary`, no placeholder. Only draft
+  straight at the clank block: no empty `## Summary`, no placeholder. Only draft
   his part if he explicitly says "write my part", and then match
   [references/voice.md](references/voice.md).
-- **Draft by default.** `gh pr create --draft` unless he says "nondraft pr"
-  or "real pr". Same for `gh stack submit` (its `--auto` default is draft).
+- **Real PR by default.** `gh pr create` with no `--draft` unless he says
+  "draft pr" or "draft". Same for `gh stack submit`: pass `--auto --open` (plain
+  `--auto` creates drafts). If he says "switch it" or "make it ready" on
+  an existing draft: `gh pr ready <n>`; to go back to draft:
+  `gh pr ready <n> --undo`.
 
 ## Titles (also the squash-merge commit subject)
 
@@ -60,7 +66,7 @@ under one `### clank` heading so reviewers know which part to trust as his.
   not a sentence explaining it. `fix(editor): gitlab git push bugs`,
   `fix(editor): colspan tables parsing`, `feat(editor): review flow`,
   `fix(editor): hocuspocus refcount bug`, `feat(live preview): more caching
-  & observability`, `perf(editor): rm .findOne() query & btree indices`.
+& observability`, `perf(editor): rm .findOne() query & btree indices`.
 - Abbreviations welcome: `rm`, `&`, `&&`, `abt`, `ui/ux`. `!` when it's a
   relief: `chore(editor): rm monaco!`, `feat(editor): bring back autocommits!`,
   `feat(editor): authenticated live previews!`.
@@ -71,8 +77,8 @@ under one `### clank` heading so reviewers know which part to trust as his.
 - **Never**: em dashes, commas splicing a list, "so that…" clauses, > ~8
   words, Title Case, a mechanism where the effect belongs. These are AI
   tells: `fix(editor): live preview tab handling — reuse, close stale,
-  re-adopt after reload`, `fix(publish): retire content-less creates after
-  publish so they cannot wedge later publishes`.
+re-adopt after reload`, `fix(publish): retire content-less creates after
+publish so they cannot wedge later publishes`.
 
 More real titles in [references/voice.md](references/voice.md).
 
@@ -87,15 +93,14 @@ More real titles in [references/voice.md](references/voice.md).
 ## Body layout
 
 ```
-<his words, verbatim, no heading>
+<his words, verbatim, no heading (USUALLY NOT THE PROMPT. do not ask what to put here. leave it empty or add it only if specified)>
 
 fixed here:
 
 ![](./demo.mp4)                          ← --attach rewrites the local path
 
-### clank
 <details>
-<summary>clank context</summary>
+<summary>clank context (clickme)</summary>
 
 Stacked on #N. / Fixes ENG-NNNN.        ← only when true
 ## What was wrong
@@ -105,32 +110,31 @@ Stacked on #N. / Fixes ENG-NNNN.        ← only when true
 </details>
 ```
 
-The `### clank` H3 stays visible as the marker; everything under it sits
-inside one `<details>` so the PR opens showing only his words, and the AI
-part expands on click. The blank line after `</summary>` and before
-`</details>` is required or GitHub won't render the markdown inside.
-Nothing AI-written goes outside the `<details>`.
+The collapsed `<details>` is the marker; the PR opens showing only his
+words, and the AI part expands on click. The blank line after `</summary>`
+and before `</details>` is required or GitHub won't render the markdown
+inside. Nothing AI-written goes outside the `<details>`.
 
 - His part is usually a short summary he writes himself. Paste it as-is
   with no heading on top. Delete the repo template's `## Summary` /
   `## Test Plan` scaffold entirely; never leave an empty heading.
-- The test plan is the AI's job and lives under `### clank`. Real commands,
+- The test plan is the AI's job and lives in the clank block. Real commands,
   test counts, what was verified by hand, and what was not. If he gives
   his own test note (`all good`, `see video in slack`), keep it in his part
   and still write the clank test plan.
 - Attachments (videos, screenshots) go in his part, each alone on its own
-  paragraph, above `### clank`. Give each one a caption on the line before
+  paragraph, above the clank block. Give each one a caption on the line before
   it: a few lowercase words, no sentence. His own captions look like
   `video proof:`, `broken here` / `fixed here`, `before:` / `after:`,
   `this was an autocommit`. Two attachments need two captions so a reader
   can tell them apart.
-- Under `### clank`: dense and reviewer-facing. Sections that have landed
+- Inside the clank block: dense and reviewer-facing. Sections that have landed
   well: `## What was wrong` / `## Fix` / `## Test plan`, or `## Problem` /
   `## Root cause` / `## Fix` / `## Test plan`, plus `## Not in this PR`
   when scope was cut. Backtick identifiers. No filler, no footer.
 - Stack, follow-up, and ticket lines (`Stacked on #N.`, `Follow-up to #N.`,
   `Fixes ENG-NNNN.`, `Supersedes #N.`, `Pair with mintlify/server#N`) are
-  AI bookkeeping: they open the `### clank` section, never his part.
+  AI bookkeeping: they open the clank block, never his part.
 - Linear ids bare (`Fixes ENG-NNNN`); same-repo PRs `#NNNN`; cross-repo
   `mintlify/server#NNNN`.
 
@@ -139,12 +143,13 @@ Nothing AI-written goes outside the `<details>`.
 Write the body to a file in the scratchpad, then:
 
 ```sh
-gh pr create --draft --title "<title>" --body-file /path/body.md \
+gh pr create --title "<title>" --body-file /path/body.md \
   --attach ./demo.mp4 --attach './after.png#alt text'
+# add --draft only if he asked for a draft
 ```
 
 `--attach` uploads the file and rewrites the matching local path in the body
-in place, so a referenced attachment stays above `### clank`; unreferenced
+in place, so a referenced attachment stays above the clank block; unreferenced
 ones get appended below it. Details: [references/attachments.md](references/attachments.md).
 
 Editing an existing PR: **always read the live body first**, never rebuild
@@ -156,9 +161,9 @@ gh pr view <n> --json body --jq .body > /path/current.md
 ```
 
 Change only what you need inside the `<details>` block, leave everything
-above `### clank` byte for byte (including bot-injected badges), then
+above the clank block byte for byte (including bot-injected badges), then
 `gh pr edit <n> --body-file /path/current.md` (also takes `--attach`). If
-the body has no `### clank` section yet, append one; never replace the whole
+the body has no clank block yet, append one; never replace the whole
 body. Same rule after a review-bot round: re-read before every edit,
 because he may have changed it while you were waiting.
 Reviewers, labels, `--base`: only when asked or when stacking.
@@ -166,7 +171,7 @@ Reviewers, labels, `--base`: only when asked or when stacking.
 ## Stacked PRs
 
 When a change depends on another open PR of his, branch off that branch and
-open the `### clank` section with `Stacked on #N.` (multi-PR stacks:
+open the clank block with `Stacked on #N.` (multi-PR stacks:
 `Stack 2/3, base #N, followed by #M`). Create with `--base <parent-branch>`,
 and link the stack with `gh stack link` (installed) so GitHub shows the
 stack and retargets on merge. Commands and caveats:
@@ -192,7 +197,7 @@ new inline comment. Commands and the exact bot logins:
   and not worth it. He decides.
 - **Respond to each bot thread as it lands, then resolve it.** Don't
   batch. Reply in the thread with one or two lines starting with `clank:`
-  (so it's marked as AI-written, same idea as the H3): what you changed
+  (so it's marked as AI-written, same idea as the clank block): what you changed
   and the commit, or why the finding doesn't apply. Then resolve the
   thread. Threads you're escalating to Rohan get a `clank:` reply saying
   so and stay open. Human reviewer comments are his to answer unless he

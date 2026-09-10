@@ -18,7 +18,7 @@ preview; subject to change. Requires the repo to have stacked PRs enabled
 
 ## Where the stack note goes
 
-The `### clank` section opens with `Stacked on #N.` (multi-PR stacks:
+The clank block opens with `Stacked on #N.` (multi-PR stacks:
 `Stack 2/3, base #N, followed by #M`). That line is AI bookkeeping, so it
 never goes in his part. Keep it even when using `gh stack`, since the
 Linear/Slack preview won't show the stack map.
@@ -64,8 +64,8 @@ gh stack init --base develop rohan/x
 gh stack add rohan/layer-two                # new branch on top
 gh stack add -Am "feat(editor): …" rohan/layer-two   # stage all + commit + branch
 
-gh stack submit --auto                      # push + create/update PRs, drafts
-gh stack submit --open                      # …ready for review
+gh stack submit --auto --open               # push + create/update PRs, ready for review (default)
+gh stack submit --auto                      # …as drafts, only if he asked for drafts
 gh stack view --short
 gh stack sync [--prune]                     # fetch, cascade-rebase, force-with-lease push, relink
 gh stack rebase [--downstack|--upstack] [--continue|--abort]

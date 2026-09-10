@@ -252,12 +252,12 @@ me`, `read it / run in dev / merge / run in prod`.
 
 `Stacked on #N.`, `Follow-up to #N.`, `Fixes ENG-NNNN.`, `Supersedes #N.`,
 `**Stack 2/3** — base: … → followed by …`, `Pair with mintlify/server#N`
-all came from AI-written PRs. Put them under `# clank`. What he writes
+all came from AI-written PRs. Put them in the clank block. What he writes
 himself is looser and stays in his part: `regressed in #N`, `depends on
 <url>`, `related: #N`, `see mint PR <url>`, `test with the related mint pr`,
 `its readonly until all the backend work is done!`.
 
-## Clank markers he has used (standardize on `### clank`)
+## Clank markers he has used (standardize on the collapsed `clank context (clickme)` block)
 
 `# clank` · `## Summary (clanked)` · `below is clanked` ·
 `## BELOW IS ALL CLANKED` · `this is what we r bundling according to clank` ·
