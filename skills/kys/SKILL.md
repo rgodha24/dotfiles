@@ -24,7 +24,14 @@ then, delete your worktree directory entirely. also if you created a herdr workt
 
 ## 3. Report, then close the pane
 
-Send one short final message: what was stopped, what was cleaned up, where kept work lives. Then confirm herdr and close:
+Report the cleanup in a short **commentary/progress message**: what was stopped,
+what was cleaned up, and where kept work lives. Do **not** send a final answer
+yet: a final answer ends the agent turn, so the close command would never run.
+
+Immediately after that report, use a shell/tool call for the close command below
+as the last action in the turn. Do not make another model response or tool call
+after it. The command must be issued, rather than merely saying that it will be
+issued:
 
 ```bash
 test "${HERDR_ENV:-}" = 1 && test -n "${HERDR_PANE_ID:-}"

@@ -206,11 +206,10 @@ in {
   };
   home.file.".pi/agent/keybindings.json".source = ../pi/keybindings.json;
 
-  # works for everything EXCEPT claude code.
-  # fuck claude code.
+  # Codex follows directory symlinks but skips symlinked SKILL.md files.
   home.file.".agents/skills" = {
     source = ../skills;
-    recursive = true;
+    recursive = false;
   };
   home.file.".claude/skills" = {
     source = ../skills;

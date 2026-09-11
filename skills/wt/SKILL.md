@@ -1,6 +1,6 @@
 ---
 name: wt
-description: "Spin up an isolated dev environment for a task: create a git worktree through Herdr, move this agent into the new workspace, and run the project on a tesser box. Use when the user asks for a new worktree, /wt, or to start work in a fresh worktree. Requires HERDR_ENV=1 and the tesser CLI."
+description: "Spin up an isolated dev environment for a task: create a git worktree through Herdr, move this agent into the new workspace, and run the project on a tesser box when the task needs a running app. Use when the user asks for a new worktree, /wt, or to start work in a fresh worktree. Requires HERDR_ENV=1 and the tesser CLI."
 ---
 
 # wt — new worktree
@@ -18,17 +18,13 @@ semantics. This skill is only the glue:
    your cwd is unchanged — treat the worktree path as the project root from
    now on; never edit the original checkout.
 
-3. If the checkout has `.claude/skills/tesser/` and the new worktree does not,
-   copy it in before any tesser command: mint and server git-exclude it, so a
-   fresh worktree has no manifests and `tesser dev` fails with
-   `no manifest for service`.
-
-4. Run the tesser canonical workflow, with every tesser command cwd'd into
+3. Only when the task needs a running app — a browser check, a real backend —
+   run the tesser canonical workflow, with every tesser command cwd'd into
    the worktree — `(cd "$WT" && tesser ...)` — since it syncs the _current_
    worktree. Detect install/dev commands from the repo instead of assuming
    pnpm.
 
-5. Report branch, worktree path, workspace id, box id, and the address
+4. Report branch, worktree path, workspace id, box id if any, and the address
    `tesser dev` printed — `http://<box_id>.localhost:<port>` — which stays on
    that box when focus moves. Work per the tesser skill from then on.
 
