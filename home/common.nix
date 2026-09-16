@@ -269,6 +269,7 @@ in {
       delta
       aoc-cli
 
+      pulumi
       pulumictl
       pulumiPackages.pulumi-nodejs
       pulumiPackages.pulumi-python

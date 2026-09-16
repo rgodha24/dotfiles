@@ -28,9 +28,7 @@ semantics. This skill is only the glue:
    `tesser dev` printed — `http://<box_id>.localhost:<port>` — which stays on
    that box when focus moves. Work per the tesser skill from then on.
 
-Teardown is the **kys** skill. One caveat when it runs after this: the pane
-move made `$HERDR_PANE_ID` stale, so close the pane id you parsed from the
-move response instead.
+Use the **kys** skill for teardown.
 
 ur branch name should be `rohan/<name>` if no linear ticket, or if there is a linear ticket it should match the linear ticket's suggested branch name
 
