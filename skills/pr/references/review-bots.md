@@ -87,6 +87,10 @@ a human.
 4. If anything was fixed, commit, push, and go to 1. Stop when a round
    produced no new actionable threads or after 3 rounds.
 
+CI runs on the same pushes and is part of the same loop — watch checks while
+you wait on the bots, and don't call the PR done until it's green. See
+[ci.md](ci.md).
+
 ## Triage rule of thumb
 
 - Real and about 10 lines or fewer: reply, fix, resolve, push, next round.

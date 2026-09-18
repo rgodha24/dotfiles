@@ -99,6 +99,11 @@ fixed here:
 
 ![](./demo.mp4)                          ← --attach rewrites the local path
 
+<details>                                ← tesser block, only when a box is up
+<summary>tesser review (clickme)</summary>
+...
+</details>
+
 <details>
 <summary>clank context (clickme)</summary>
 
@@ -113,7 +118,8 @@ Stacked on #N. / Fixes ENG-NNNN.        ← only when true
 The collapsed `<details>` is the marker; the PR opens showing only his
 words, and the AI part expands on click. The blank line after `</summary>`
 and before `</details>` is required or GitHub won't render the markdown
-inside. Nothing AI-written goes outside the `<details>`.
+inside. Nothing AI-written goes outside the `<details>` blocks; the only
+block that may sit next to the clank one is the tesser review block below.
 
 - His part is usually a short summary he writes himself. Paste it as-is
   with no heading on top. Delete the repo template's `## Summary` /
@@ -128,6 +134,8 @@ inside. Nothing AI-written goes outside the `<details>`.
   `video proof:`, `broken here` / `fixed here`, `before:` / `after:`,
   `this was an autocommit`. Two attachments need two captions so a reader
   can tell them apart.
+- A tesser review link is neither his words nor clank context: it gets its
+  own collapsed block above the clank block. See "Tesser review link" below.
 - Inside the clank block: dense and reviewer-facing. Sections that have landed
   well: `## What was wrong` / `## Fix` / `## Test plan`, or `## Problem` /
   `## Root cause` / `## Fix` / `## Test plan`, plus `## Not in this PR`
@@ -137,6 +145,65 @@ inside. Nothing AI-written goes outside the `<details>`.
   AI bookkeeping: they open the clank block, never his part.
 - Linear ids bare (`Fixes ENG-NNNN`); same-repo PRs `#NNNN`; cross-repo
   `mintlify/server#NNNN`.
+
+## Before you open it
+
+Reread the whole diff and cut it down. Same behavior, less code.
+
+- Delete what you added and stopped needing: dead helpers, a flag with one
+  caller, stray logs, commented-out code, a `TODO` you just wrote.
+- Inline indirection you invented: a wrapper that only forwards, a type alias
+  used once, a helper called from one place.
+- Shrink the surface: fewer new exports, params, and files. Private over public.
+- Use the repo's existing util/pattern instead of a new one next to it.
+- Drop unrelated formatting churn and drive-by renames.
+
+**No new bugs, no behavior change.** A cleanup that changes semantics or needs
+a real rewrite doesn't belong here; leave it. Typecheck and tests again after
+the pass. The `simplify` skill does this pass if it's available.
+
+## Tests
+
+Worth writing: unit tests for a function with real edge cases (parsers, path
+munging, date math, retry logic); a regression test for the bug being fixed,
+failing on `main` and passing here; an e2e or integration test for a flow the
+change touches, if the harness already exists.
+
+Not worth writing: asserting something was removed; snapshot/render tests that
+re-encode current markup; asserting a mock got called; a case that restates a
+branch already covered.
+
+"No new tests" is a fine answer. Say it in the clank test plan with what you
+checked by hand instead.
+
+## Tesser review link
+
+If a tesser box is already up and serving the branch, give reviewers the live
+thing: `tesser share <box_id>` prints a link (`tesser ls` finds the box) that
+anyone in the org opens with `tesser review`. Its own collapsed block, directly
+above the clank block, with the logins, or it's useless:
+
+```
+<details>
+<summary>tesser review (clickme)</summary>
+
+tesser review https://tesser.sh/r#...
+
+dashboard: http://<dash_box_id>.localhost:3000
+org: <name>
+
+| login                 | password   | roles                 |
+| --------------------- | ---------- | --------------------- |
+| `admin@<name>.test`   | `password` | `admin,editor,viewer` |
+| `editor1@<name>.test` | `password` | `editor,viewer`       |
+
+</details>
+```
+
+- Seeded throwaway logins only (`seed-org.sh <name>` makes them; the repo's
+  `.claude/skills/tesser/SKILL.md` has the rest). Never paste a real credential.
+- Default TTL 7d is right. Don't make a box just to have a link.
+- When the box dies: `tesser share <box_id> --revoke` and drop the block.
 
 ## Creating the PR
 
@@ -177,12 +244,32 @@ and link the stack with `gh stack link` (installed) so GitHub shows the
 stack and retargets on merge. Commands and caveats:
 [references/stacked-prs.md](references/stacked-prs.md).
 
-## After creating: loop on the review bots
+## After creating: babysit CI and the review bots
 
-greptile, Devin Review, and Cursor Bugbot comment on every PR 2 to 5 minutes
-after each push. After creating or pushing, wait for them, then triage each
-new inline comment. Commands and the exact bot logins:
+Two things happen after every push and you wait on both: CI runs, and
+greptile, Devin Review, and Cursor Bugbot comment 2 to 5 minutes later. Don't
+hand the PR back until CI is green (or you know why it isn't) and the bot
+threads are handled. Commands and the exact bot logins:
+[references/ci.md](references/ci.md),
 [references/review-bots.md](references/review-bots.md).
+
+### CI
+
+- **Watch it, don't fire and forget.** `gh pr checks <n> --watch --interval 30`
+  after each push, ~15 minutes max, then one-shot polling.
+- **Read the actual log before guessing.** `gh run view --job <id> --log-failed`
+  on the failed job, not the whole run.
+- **Fix real failures caused by this branch yourself.** No 10-line cap like
+  the bots. It's almost always lint, formatting, types, or a test the diff
+  broke: just fix it and push. Only stop and ask if the honest fix means
+  changing the approach of the PR.
+- **Re-run a flake once.** `gh run rerun <run id> --failed`. Twice on the same
+  commit means it's real. Never "fix" a flake with a sleep or a looser assert.
+- **Check whether it's already red on main** before owning it.
+- **Never go green by cheating**: no skipping tests, no editing the workflow,
+  no `continue-on-error`, unless he asks for exactly that.
+
+### Review bots
 
 - **Assume the comment may be wrong.** A lot of them are fake or overblown:
   a race that can't happen, a null path the types rule out, an "edge case"
@@ -204,5 +291,5 @@ new inline comment. Commands and the exact bot logins:
   asks.
 
 Then report: PR URL, the title, draft or not, whether the top section is his
-words or absent, what the bots said, what you fixed, what you
-dismissed and why, and what's waiting on him.
+words or absent, CI status (green, or which job failed and why), what the bots
+said, what you fixed, what you dismissed and why, and what's waiting on him.
