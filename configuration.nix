@@ -129,6 +129,8 @@
     extraGroups = ["networkmanager" "wheel" "docker" "adbusers" "dialout"];
     packages = with pkgs; [git];
     shell = pkgs.fish;
+    # keep user services (t3code) running after logout / at boot
+    linger = true;
   };
 
   # Allow unfree packages
