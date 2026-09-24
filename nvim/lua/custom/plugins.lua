@@ -198,6 +198,40 @@ local plugins = {
     },
   },
   {
+    "dmtrKovalenko/fff",
+    build = vim.uv.fs_stat "/etc/NIXOS" and "nix run .#release" or function()
+      require("fff.download").download_or_build_binary()
+    end,
+    lazy = false, -- the plugin lazy-initialises itself
+    opts = {
+      prompt_vim_mode = true, -- <Esc> -> normal mode (j/k), second <Esc> closes
+    },
+    keys = {
+      {
+        "<leader>ff",
+        function()
+          require("fff").find_files()
+        end,
+        desc = "Find files",
+      },
+      {
+        "<leader>fw",
+        function()
+          require("fff").live_grep()
+        end,
+        desc = "Live grep",
+      },
+      {
+        "<leader>fW",
+        function()
+          require("fff").live_grep_under_cursor()
+        end,
+        mode = { "n", "x" },
+        desc = "Grep word / selection",
+      },
+    },
+  },
+  {
     "sindrets/diffview.nvim",
     opts = {
       default_args = {

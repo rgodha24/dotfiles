@@ -134,9 +134,9 @@ in {
 
   services.ghfs = {
     enable = true;
-    # GHFS runs Git-backed tests but omits git from nativeCheckInputs.
+    # huge_directory's local `git clone` fails inside the darwin build sandbox.
     package = ghfs.packages.${system}.default.overrideAttrs (old: {
-      nativeCheckInputs = (old.nativeCheckInputs or []) ++ [pkgs.git];
+      checkFlags = (old.checkFlags or []) ++ ["--skip=huge_directory"];
     });
   };
 
