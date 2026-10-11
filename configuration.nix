@@ -34,14 +34,12 @@
 
   nix.settings.substituters = [
     "https://cache.nixos.org"
-    "https://cuda-maintainers.cachix.org"
     "https://cache.nixos-cuda.org"
     "https://pi.cachix.org"
     "https://nix-community.cachix.org"
   ];
   nix.settings.trusted-public-keys = [
     "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-    "cuda-maintainers.cachix.org-1:0dq3bujKpuEPMCX6U4WylrUDZ9JyUG0VpVZa7CNfq5E="
     "cache.nixos-cuda.org:74DUi4Ye579gUqzH4ziL9IyiJBlDpMRn9MBN8oNan9M="
     "pi.cachix.org-1:lGeoGJaZ5ZDabuRzkcD5EBTNnDM4HJ1vqeOxlWk1Flk="
     "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
@@ -237,6 +235,9 @@
     };
   };
   services.blueman.enable = true;
+  hardware.xpadneo.enable = true; # Xbox controllers over Bluetooth
+  boot.blacklistedKernelModules = ["hid_microsoft"]; # otherwise it grabs the controller before xpadneo
+  boot.extraModprobeConfig = "options btusb enable_autosuspend=0"; # keep the onboard MT7922 BT radio awake; autosuspend is a common cause of controller drops
   security.polkit.enable = true;
 
   hardware.graphics.enable = true; #opengl
@@ -254,6 +255,13 @@
       persistencedSha256 = "sha256-AtjM/ml/ngZil8DMYNH+P111ohuk9mWw5t4z7CHjPWw=";
     };
   };
+
+  # Stable, colon-free alias for the NVIDIA dGPU. /dev/dri/cardN renumbers
+  # across boots and aquamarine splits AQ_DRM_DEVICES on ':' so the by-path
+  # symlink can't be used. hyprland.conf points at /dev/dri/nvidia-card.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="drm", KERNEL=="card[0-9]|card[0-9][0-9]", ATTRS{vendor}=="0x10de", SYMLINK+="dri/nvidia-card"
+  '';
 
   # expose CUDA/driver libs to unpatched binaries (uv, pip, etc.) via nix-ld
   programs.nix-ld.libraries = with pkgs; [

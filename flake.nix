@@ -9,7 +9,9 @@
       url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    pkgsunstable.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # pinned to master tip incl. b01001ac (cudaPackages_13_3.cccl: don't
+    # patch 13.3+) until nixos-unstable picks it up; then revert to nixos-unstable
+    pkgsunstable.url = "github:NixOS/nixpkgs/5c9db1a5400a7b832cfc898abe27000ad129b9be";
     # pinned for neovim 0.11 until plugins are compatible with 0.12
     pkgs-neovim.url = "github:NixOS/nixpkgs/2fc6539b481e1d2569f25f8799236694180c0993";
     fenix = {

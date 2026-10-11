@@ -16,14 +16,14 @@
 }: let
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
     pname = "cryptenv";
-    version = "0.4.0";
+    version = "0.5.1";
     src = pkgs.fetchFromGitHub {
       owner = "rgodha24";
       repo = "cryptenv";
-      rev = "c38e548d0e2ca22ff568a996a949a0fedf2c2209";
-      sha256 = "sha256-LAdtxBmrIt+E/qJF80rtBvztTJbOI7+dzkRQHjUlivQ=";
+      rev = "990dc1b9635221702a3db87ccafb95d11bb98387";
+      sha256 = "sha256-eOEnwfQSHEq6fx1zlJenYGMSPsu697YFHzOXdUke3JQ=";
     };
-    cargoHash = "sha256-ItqUp1mGO6hinWRRapJZdHjfkDe+/xqIPnkzKGV4dkM=";
+    cargoHash = "sha256-55cUmpUEWdvh3WFQJkMjIBDM7bUa2FbPQ23oascCZ/8=";
   };
 
   cursorAgentVersion = "2026.09.18-9a7762b";
@@ -90,8 +90,8 @@
       sha256 = cursorAgentSha256.${system};
     };
 
-    nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.autoPatchelfHook];
-    buildInputs = pkgs.lib.optionals pkgs.stdenv.isLinux [pkgs.stdenv.cc.cc.lib];
+    nativeBuildInputs = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.autoPatchelfHook];
+    buildInputs = pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [pkgs.stdenv.cc.cc.lib pkgs.zlib];
 
     sourceRoot = ".";
 

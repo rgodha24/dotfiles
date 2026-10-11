@@ -39,11 +39,18 @@ AWS_ACCESS_KEY_ID = "AI_AWS_ACCESS_KEY_ID"
 AWS_SECRET_ACCESS_KEY = "AI_AWS_SECRET_ACCESS_KEY"
 # DEEPGRAM_API_KEY = "DEEPGRAM_API_KEY"
 
+[profile.tesser]
+CLOUDFLARE_API_TOKEN = "TESSER_CF_OBS_TOKEN"
+WORKOS_CLIENT_ID = "TESSER_WORKOS_CLIENT_ID"
+WORKOS_API_KEY = "TESSER_WORKOS_API_KEY"
+WORKOS_COOKIE_PASSWORD = "TESSER_WORKOS_COOKIE_PASSWORD"
+
 [project]
 unstoppable = ["unstoppable"]
 attendance = ["attendance"]
 "brainrot.mov" = ["brainrot"]
 sst = ["brainrot"]
+tesser = ["tesser"]
 
 [project.old-asset]
 profiles = ["unstoppable"]
