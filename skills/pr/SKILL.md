@@ -253,10 +253,25 @@ threads are handled. Commands and the exact bot logins:
 [references/ci.md](references/ci.md),
 [references/review-bots.md](references/review-bots.md).
 
+### Watching
+
+In T3 Code, use the builtin watcher instead of polling: `link_pull_request`
+right after creating the PR (every layer of a stack), handle whatever
+comments are already there, then `watch_pull_request` and end the turn. T3
+wakes the thread when a check fails, the required checks pass, someone
+comments or reviews, or the branch conflicts. No `gh pr checks --watch`, no
+sleeps, no polling the comments endpoint. A wake is news, not a verdict: read
+the checks and threads yourself. `unwatch_pull_request` before handing the PR
+back.
+
+Outside T3 Code (no `watch_pull_request` tool), fall back to
+`gh pr checks <n> --watch --interval 30` and the manual bot polling in the
+references.
+
 ### CI
 
-- **Watch it, don't fire and forget.** `gh pr checks <n> --watch --interval 30`
-  after each push, ~15 minutes max, then one-shot polling.
+- **Watch it, don't fire and forget.** Every push gets watched until it
+  settles, by the T3 watcher or the `gh` fallback.
 - **Read the actual log before guessing.** `gh run view --job <id> --log-failed`
   on the failed job, not the whole run.
 - **Fix real failures caused by this branch yourself.** No 10-line cap like

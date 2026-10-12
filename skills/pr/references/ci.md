@@ -1,22 +1,44 @@
 # Babysitting CI
 
 CI starts on every push and finishes on its own clock, usually slower than the
-review bots. Watch both in the same loop: poll checks, and when one fails,
-pull the failing job's log and fix it the same way you'd handle a bot comment.
+review bots. Watch both in the same loop, and when a check fails, pull the
+failing job's log and fix it the same way you'd handle a bot comment.
 
-## Poll
+## Watch
+
+In T3 Code, let the app watch. Call `watch_pull_request` with the PR URL (it
+links the PR if it isn't already) and end the turn. T3 checks every two
+minutes and wakes the thread when a check fails, the required checks pass,
+someone else comments or reviews, or the branch starts to conflict with its
+base. Don't run `gh pr checks --watch`, sleep, or poll alongside it.
+
+- Only comments posted after the call wake you, so read and handle the
+  existing ones before watching.
+- The watch survives pushes; no need to re-arm it after each fix.
+- A wake only says something changed. Take a snapshot and decide from that.
+- Subagents can't watch; the parent thread owns the PR.
+- Call `unwatch_pull_request` before handing back, so the thread returns to
+  Rohan's inbox. The watch also ends on its own when the PR merges or closes.
+
+Snapshot, on a wake or any time you need the current state:
 
 ```sh
-gh pr checks <n> --watch --interval 30        # blocks until every check settles
 gh pr checks <n>                              # one-shot snapshot
 gh pr checks <n> --json name,state,link --jq \
   '.[] | select(.state != "SUCCESS" and .state != "SKIPPED") | "\(.state) \(.name) \(.link)"'
 ```
 
-`--watch` is the right default after a push; give it a ~15 minute ceiling and
-fall back to one-shot polling if it hangs. `PENDING`/`IN_PROGRESS` means keep
-waiting, `SUCCESS`/`SKIPPED` means done, anything else (`FAILURE`, `ERROR`,
+`PENDING`/`IN_PROGRESS` means keep waiting (end the turn, the watcher will
+wake you), `SUCCESS`/`SKIPPED` means done, anything else (`FAILURE`, `ERROR`,
 `CANCELLED`, `TIMED_OUT`, `ACTION_REQUIRED`) is yours to triage.
+
+Outside T3 Code there is no watcher tool, so block on gh instead:
+
+```sh
+gh pr checks <n> --watch --interval 30        # blocks until every check settles
+```
+
+Give it a ~15 minute ceiling and fall back to one-shot snapshots if it hangs.
 
 ## Read a failure
 
@@ -86,12 +108,15 @@ verified changed, following the re-read-before-edit rule in SKILL.md.
 One loop, two signals:
 
 1. Push. Note the timestamp.
-2. Start `gh pr checks <n> --watch` and, in parallel, poll bot comments at
-   ~4 minutes (see review-bots.md). Handle whichever lands first.
+2. `watch_pull_request` if it isn't already watching, then end the turn.
+   Each wake is a failed check, green required checks, or a new comment;
+   handle whichever lands first. (Outside T3 Code: `gh pr checks <n> --watch`
+   and, in parallel, poll bot comments at ~4 minutes, see review-bots.md.)
 3. Fix real CI failures and real small bot findings; reply and resolve bot
    threads as they arrive.
 4. If anything was pushed, go to 1. Stop when CI is green and a bot round
    adds nothing new, or after 3 rounds.
 
 If CI is still red after 3 rounds, stop and report: which job, the failing
-step, the last ~10 lines that matter, and what you think it needs.
+step, the last ~10 lines that matter, and what you think it needs. Either
+way, `unwatch_pull_request` before you report back.

@@ -12,8 +12,11 @@ Noise to ignore: `socket-security[bot]` (dependency diffs), `github-actions[bot]
 (bundle analysis). The Devin badge and Cursor summary that get injected into
 the PR body are theirs; leave them alone when editing the body.
 
-Timing: 2 to 5 minutes after every push. Wait about 4 minutes, then fetch;
-if a bot hasn't posted a review yet, poll once more a minute later.
+Timing: 2 to 5 minutes after every push. In T3 Code the PR watcher
+(`watch_pull_request`, see [ci.md](ci.md)) wakes the thread when a bot
+comments or reviews, so don't wait or poll: end the turn and fetch on the
+wake. Outside T3 Code, wait about 4 minutes, then fetch; if a bot hasn't
+posted a review yet, poll once more a minute later.
 
 ## Fetch new inline comments since a push
 
@@ -79,16 +82,18 @@ a human.
 ## Order of operations per round
 
 1. Push. Note the timestamp.
-2. Wait ~4 minutes, then poll the comments endpoint every minute until all
-   three bots have posted a review (or 10 minutes pass).
+2. With the T3 watcher on, end the turn and fetch new comments each time it
+   wakes you. Without it, wait ~4 minutes, then poll the comments endpoint
+   every minute until all three bots have posted a review (or 10 minutes
+   pass).
 3. For each new thread, in arrival order: read the code, decide, reply
    with `clank:`, fix if warranted, resolve. Handle a thread as soon as it
    appears; don't wait for the other bots to finish.
 4. If anything was fixed, commit, push, and go to 1. Stop when a round
    produced no new actionable threads or after 3 rounds.
 
-CI runs on the same pushes and is part of the same loop — watch checks while
-you wait on the bots, and don't call the PR done until it's green. See
+CI runs on the same pushes and is part of the same loop (the same watcher
+covers both), and don't call the PR done until it's green. See
 [ci.md](ci.md).
 
 ## Triage rule of thumb
