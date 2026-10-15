@@ -1,39 +1,101 @@
-# T3 Code CLI. The background server itself is managed by upstream's own installer
-# (`t3 connect` / `t3 service install`), which writes ~/.config/systemd/user/t3code.service
-# and keeps a self-updating copy under ~/.t3/runtime. This module only puts `t3` on PATH.
-#
-# Useful commands:
-#   t3 connect status        # connect + relay state
-#   t3 service status        # service health and log path
-#   npx t3@latest service update
 {
+  config,
+  lib,
   pkgs,
   unstable,
   system,
   claude-code-nix,
   codex-cli-nix,
+  t3code,
   ...
 }: let
-  # nixpkgs builds t3code without the T3 Connect public config (relay URL, Clerk
-  # publishable key, CLI OAuth client id), so `t3 connect` refuses to run. Those are
-  # public identifiers shipped in the repo's .env.example; copying it to .env before
-  # the build bakes them into the server and web bundles like the official release.
-  t3code-unwrapped = unstable.t3code.unwrapped.overrideAttrs (prev: {
-    postPatch =
-      (prev.postPatch or "")
-      + ''
-        cp .env.example .env
-      '';
-  });
-  t3code = unstable.t3code.override {
-    inherit t3code-unwrapped;
-    enableClaude = true;
-    claude-code = claude-code-nix.packages.${system}.default;
-    enableCodex = true;
-    codex = codex-cli-nix.packages.${system}.default;
-    enableGit = true;
-    enableGitHub = true;
+  meta = builtins.fromJSON (builtins.readFile t3code);
+
+  t3code-unwrapped = unstable.stdenv.mkDerivation {
+    pname = "t3code-unwrapped";
+    inherit (meta) version;
+
+    src = unstable.fetchurl {
+      url = meta.dist.tarball;
+      hash = meta.dist.integrity;
+    };
+
+    nativeBuildInputs = lib.optionals unstable.stdenv.hostPlatform.isLinux [
+      unstable.autoPatchelfHook
+    ];
+    buildInputs = lib.optionals unstable.stdenv.hostPlatform.isLinux [
+      unstable.stdenv.cc.cc.lib
+    ];
+
+    dontStrip = true;
+    dontConfigure = true;
+    dontBuild = true;
+
+    installPhase = ''
+      runHook preInstall
+      mkdir -p $out/libexec $out/bin
+      cp -R . $out/libexec/t3code
+      chmod +x $out/libexec/t3code/t3
+      ln -s ../libexec/t3code/t3 $out/bin/t3
+      runHook postInstall
+    '';
+
+    meta = {
+      description = "T3 Code CLI (prebuilt upstream release)";
+      homepage = "https://t3.codes";
+      changelog = "https://github.com/pingdotgg/t3code/releases/tag/v${meta.version}";
+      license = lib.licenses.mit;
+      mainProgram = "t3";
+      platforms = ["x86_64-linux"];
+    };
   };
+
+  runtimePackages = [
+    claude-code-nix.packages.${system}.default
+    codex-cli-nix.packages.${system}.default
+    pkgs.git
+    pkgs.gh
+  ];
+
+  t3code-wrapped = unstable.symlinkJoin {
+    pname = "t3code";
+    inherit (t3code-unwrapped) version meta;
+    paths = [t3code-unwrapped];
+    nativeBuildInputs = [unstable.makeBinaryWrapper];
+    postBuild = ''
+      rm $out/bin/t3
+      makeBinaryWrapper $out/libexec/t3code/t3 $out/bin/t3 \
+        --prefix PATH : ${lib.makeBinPath runtimePackages}
+    '';
+    passthru.unwrapped = t3code-unwrapped;
+  };
+
+  t3Home = "${config.home.homeDirectory}/.t3";
 in {
-  home.packages = [t3code];
+  home.packages = [t3code-wrapped];
+
+  systemd.user.startServices = "sd-switch";
+
+  systemd.user.services.t3code = {
+    Unit = {
+      Description = "T3 Code server";
+      After = ["network-online.target"];
+      StartLimitIntervalSec = 300;
+      StartLimitBurst = 5;
+    };
+    Service = {
+      Type = "simple";
+      WorkingDirectory = "%h";
+      Environment = [
+        "T3CODE_HOME=${t3Home}"
+        "T3_BOOT_SERVICE_UNIT=t3code.service"
+      ];
+      ExecStart = "${t3code-wrapped}/bin/t3 serve";
+      KillMode = "mixed";
+      OOMPolicy = "continue";
+      Restart = "always";
+      RestartSec = 5;
+    };
+    Install.WantedBy = ["default.target"];
+  };
 }

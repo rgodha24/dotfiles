@@ -269,6 +269,24 @@
     zlib
     libGL
     config.hardware.nvidia.package
+
+    nss
+    nspr
+    glib
+    at-spi2-core
+    dbus
+    expat
+    libgbm
+    libxkbcommon
+    alsa-lib
+    systemd # libudev
+    xorg.libX11
+    xorg.libxcb
+    xorg.libXcomposite
+    xorg.libXdamage
+    xorg.libXext
+    xorg.libXfixes
+    xorg.libXrandr
   ];
 
   services.tailscale = {

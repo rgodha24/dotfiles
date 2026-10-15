@@ -709,7 +709,8 @@
         "opencode": "opencode",
         "pi": "pi",
         "pkgs-neovim": "pkgs-neovim",
-        "pkgsunstable": "pkgsunstable"
+        "pkgsunstable": "pkgsunstable",
+        "t3code": "t3code"
       }
     },
     "rust-analyzer-src": {
@@ -861,6 +862,18 @@
         "owner": "nix-systems",
         "repo": "default",
         "type": "github"
+      }
+    },
+    "t3code": {
+      "flake": false,
+      "locked": {
+        "narHash": "sha256-RThA9+qmmcZkITu9lvriCgy2tfMgtyp2yozJA2yoQA8=",
+        "type": "file",
+        "url": "https://registry.npmjs.org/@t3code%2Ft3-linux-x64/nightly"
+      },
+      "original": {
+        "type": "file",
+        "url": "https://registry.npmjs.org/@t3code%2Ft3-linux-x64/nightly"
       }
     },
     "treefmt-nix": {

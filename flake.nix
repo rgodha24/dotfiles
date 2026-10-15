@@ -50,6 +50,11 @@
       url = "github:lukasl-dev/pi.nix";
       inputs.nixpkgs.follows = "pkgsunstable";
     };
+    # npm dist-tag metadata for the prebuilt t3 nightly; `nix flake update t3code` bumps it
+    t3code = {
+      url = "file+https://registry.npmjs.org/@t3code%2Ft3-linux-x64/nightly";
+      flake = false;
+    };
   };
 
   outputs = {
@@ -58,6 +63,7 @@
     pkgs-neovim,
     home-manager,
     determinate,
+    t3code,
     fenix,
     opencode,
     ghfs,
@@ -107,7 +113,7 @@
     homeConfigurations.nixos = home-manager.lib.homeManagerConfiguration {
       pkgs = pkgsFor linuxSystem;
       extraSpecialArgs = {
-        inherit unstable pkgsunstable fenixPkgs opencode ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi neovim-pin;
+        inherit unstable pkgsunstable fenixPkgs opencode ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi neovim-pin t3code;
         system = linuxSystem;
       };
       modules = [

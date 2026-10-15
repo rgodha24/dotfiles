@@ -62,6 +62,14 @@
   };
 
   # Hyprpaper wallpaper daemon
+  # ghfs repacks big repos (posthog) and pins a core; keep it quiet.
+  systemd.user.services.ghfs.Service = {
+    CPUQuota = "100%";
+    CPUWeight = 10;
+    Nice = 19;
+    IOSchedulingClass = "idle";
+  };
+
   services.hyprpaper.enable = true;
   home.file.".config/hypr/hyprpaper.conf".source = ../hyprpaper.conf;
 
