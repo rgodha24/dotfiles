@@ -188,7 +188,7 @@ in {
   # v2 tui plugin api; registered in ~/.config/opencode/cli.json
   home.file.".config/opencode/herdr-opencode2-session.js".source = ../herdr/integrations/opencode2-tui.js;
 
-  imports = [pi.homeModules.default];
+  imports = [pi.homeModules.default ./cliproxyapi-client.nix];
   programs.pi.coding-agent = {
     enable = true;
     settings = {

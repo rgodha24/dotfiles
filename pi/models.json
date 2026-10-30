@@ -1,0 +1,15 @@
+{
+  "providers": {
+    "cliproxy": {
+      "baseUrl": "https://nixos.tail76974f.ts.net:8317/v1",
+      "api": "openai-responses",
+      "apiKey": "cliproxy",
+      "models": [
+        { "id": "gpt-6-astra", "reasoning": true },
+        { "id": "gpt-6.1-sol", "reasoning": true },
+        { "id": "gpt-6.1-terra", "reasoning": true },
+        { "id": "gpt-6-luna", "reasoning": true }
+      ]
+    }
+  }
+}

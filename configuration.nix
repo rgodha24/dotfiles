@@ -294,6 +294,21 @@
     extraUpFlags = ["--accept-dns=false"];
   };
 
+  systemd.services.tailscale-serve-cliproxyapi = {
+    description = "tailscale serve for cliproxyapi";
+    after = ["tailscaled.service"];
+    wants = ["tailscaled.service"];
+    wantedBy = ["multi-user.target"];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=8317 http://127.0.0.1:8317";
+      ExecStop = "${pkgs.tailscale}/bin/tailscale serve --https=8317 off";
+      Restart = "on-failure";
+      RestartSec = 10;
+    };
+  };
+
   # XDG portal for screen sharing and file dialogs
   xdg.portal = {
     enable = true;

@@ -148,33 +148,5 @@
         ./home/darwin.nix
       ];
     };
-
-    homeConfigurations.work = home-manager.lib.homeManagerConfiguration {
-      pkgs = pkgsFor darwinSystem;
-      extraSpecialArgs = {
-        system = darwinSystem;
-        unstable = unstableFor darwinSystem;
-        username = "rgodha";
-        inherit opencode;
-        inherit ghfs;
-        inherit docfs;
-        inherit lumen;
-        inherit claude-code-nix;
-        inherit codex-cli-nix;
-        inherit herdr;
-        inherit pi;
-        neovim-pin =
-          (import pkgs-neovim {
-            system = darwinSystem;
-            config.allowUnfree = true;
-          }).neovim;
-      };
-      modules = [
-        ghfs.homeManagerModules.default
-        ./home/common.nix
-        ./home/darwin.nix
-        ./home/work.nix
-      ];
-    };
   };
 }
