@@ -6,27 +6,28 @@
 }: let
   version = "8.0.48";
 
-  cliproxyapi = unstable.stdenv.mkDerivation {
+  # built from source to carry the soonest-reset routing strategy, which upstream
+  # won't merge (quota-aware routing is out of scope for core, see issue #4715)
+  cliproxyapi = (unstable.buildGoModule.override {go = unstable.go_latest;}) {
     pname = "cliproxyapi";
     inherit version;
 
-    src = unstable.fetchurl {
-      url = "https://github.com/router-for-me/CLIProxyAPI/releases/download/v${version}/CLIProxyAPI_${version}_linux_amd64.tar.gz";
-      hash = "sha256-CVxG5xZYQs9WP5ZlvobPJKKbqU5Xq5vWdYj+XMTHElw=";
+    src = unstable.fetchFromGitHub {
+      owner = "router-for-me";
+      repo = "CLIProxyAPI";
+      rev = "v${version}";
+      hash = "sha256-BD/FxJWgY9WzPtXb8z2RtLrrL4s8Wj/6ny0VM13ON/w=";
     };
-    sourceRoot = ".";
+    vendorHash = "sha256-yMO0DdE0pjtFxWaQXV17enV8u0KA5fIUbE8Gui/RvWU=";
 
-    nativeBuildInputs = [unstable.autoPatchelfHook];
-    buildInputs = [unstable.stdenv.cc.cc.lib];
+    # https://github.com/router-for-me/CLIProxyAPI/pull/7040
+    patches = [./patches/cliproxyapi-soonest-reset.patch];
 
-    dontStrip = true;
-    dontConfigure = true;
-    dontBuild = true;
+    subPackages = ["cmd/server"];
+    ldflags = ["-s" "-w" "-X main.Version=${version}"];
 
-    installPhase = ''
-      runHook preInstall
-      install -Dm755 cli-proxy-api $out/bin/cli-proxy-api
-      runHook postInstall
+    postInstall = ''
+      mv $out/bin/server $out/bin/cli-proxy-api
     '';
 
     meta = {
@@ -58,7 +59,7 @@
     access.api-keys = [];
 
     routing = {
-      strategy = "fill-first";
+      strategy = "soonest-reset";
       session-affinity = true;
       session-affinity-ttl = "1h";
       retry = {

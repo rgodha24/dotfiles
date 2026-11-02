@@ -1,0 +1,2276 @@
+From 75aedbdf499c511411ecf17f806344b33749a0b4 Mon Sep 17 00:00:00 2001
+From: Todd J Crane <toddjcrane@bossman.gbcyber.net>
+Date: Mon, 26 Oct 2026 02:24:15 -0500
+Subject: [PATCH] feat(auth): add soonest-reset routing strategy
+
+Add a soonest-reset routing strategy (alias reset-first) that spends the
+credential whose weekly usage window resets soonest, so subscription quota
+that would otherwise expire unused is consumed first.
+
+Credentials are ranked from their latest passive quota snapshot: Claude
+anthropic-ratelimit-unified-5h/7d-* and Codex x-codex-primary/secondary-*
+response headers, and Devin's polled daily/weekly quota. Credentials with a
+used-up window go last. A Claude/Codex subscription whose weekly reset is
+not known yet (after a restart or once its window rolled over) is probed
+first, and concurrent picks skip it for up to five minutes while that
+response is pending. Then known resets go earliest first, then other
+subscriptions, then credentials with nothing to learn (API keys, other
+providers). Ties resolve to the lowest ID, like fill-first.
+
+Snapshots without usage windows, such as Claude's request-scoped fast-mode
+credit refusal, keep the last observed windows, so a client that tries fast
+mode before falling back does not push traffic off the soonest-reset
+credential. A Claude unified rejection without windows still counts as used
+up until its reset. Token counts and SelectAuth callers never spend a probe.
+
+The scheduler fast path and the legacy selector path (used with session
+affinity and by SelectAuth callers) rank the same facts: the scheduler parses
+them whenever a credential's metadata is replaced, carrying them across
+windowless snapshots, and the legacy path hands them to the selector through
+the context, since session affinity serves most requests without a pick. The
+scheduler ranks from provider-level metadata, so targeted result updates are
+seen by every model shard, and the mixed-provider pick ranks across providers
+like the legacy selector.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ config.example.yaml                           |   17 +-
+ internal/config/config_types.go               |    3 +-
+ sdk/cliproxy/auth/conductor_execution.go      |    3 +-
+ sdk/cliproxy/auth/conductor_selection.go      |   12 +-
+ .../auth/conductor_selection_cooldown_test.go |    1 +
+ sdk/cliproxy/auth/scheduler.go                |  137 ++
+ sdk/cliproxy/auth/selector.go                 |   27 +
+ sdk/cliproxy/auth/soonest_reset.go            |  487 +++++++
+ sdk/cliproxy/auth/soonest_reset_test.go       | 1259 +++++++++++++++++
+ sdk/cliproxy/service_config.go                |    4 +
+ sdk/cliproxy/service_config_weight_test.go    |   24 +
+ 11 files changed, 1967 insertions(+), 7 deletions(-)
+ create mode 100644 sdk/cliproxy/auth/soonest_reset.go
+ create mode 100644 sdk/cliproxy/auth/soonest_reset_test.go
+
+diff --git a/config.example.yaml b/config.example.yaml
+index 5ad9b0effde..5b1c1385566 100644
+--- a/config.example.yaml
++++ b/config.example.yaml
+@@ -156,10 +156,25 @@ access:
+ 
+ # Routing strategy for selecting credentials when multiple match.
+ routing:
+-  strategy: "round-robin" # round-robin (default), weighted-round-robin, fill-first
++  strategy: "round-robin" # round-robin (default), weighted-round-robin, fill-first, soonest-reset
+   # weighted-round-robin uses each credential's integer weight (default 1, maximum 1,000,000).
+   # Non-positive weights exclude the credential while this strategy is active.
+   # For OAuth/file credentials, add a top-level numeric "weight" field to the auth JSON.
++  # soonest-reset (alias reset-first) spends the credential whose weekly usage window resets
++  # soonest, so subscription quota that would expire unused is consumed first. It ranks each
++  # credential's latest quota snapshot: Claude anthropic-ratelimit-unified-5h/7d-* and Codex
++  # x-codex-primary/secondary-* response headers, and Devin's polled daily/weekly quota.
++  # Within the highest priority tier: credentials with any used-up window (Claude 5h/7d, Codex
++  # primary/secondary, Devin daily/weekly) go last. A Claude/Codex subscription whose weekly
++  # reset is not known yet (after a restart, or once its window rolled over) is picked first
++  # as a probe; while that response is pending (up to 5 minutes) it ranks after known resets
++  # but still ahead of credentials with nothing to learn. Responses without usage windows,
++  # such as Claude's fast-mode credit refusal, keep the last observed windows; a Claude
++  # rejection without windows still counts as used up until its reset. Token counts
++  # never probe. Then known resets go earliest first, then subscriptions
++  # without a known weekly reset, then credentials with none to learn (API keys, other
++  # providers). Ties go to the first credential by ID, as fill-first. Snapshots are kept in
++  # memory only, so ranks are relearned after a restart. Not applied in CLIProxyAPIHome mode.
+   # Enable universal session-sticky routing for all clients.
+   # Explicit Claude Code, Codex, OpenCode, and pi session headers are preferred,
+   # followed by prompt_cache_key, Responses conversation IDs, legacy body IDs,
+diff --git a/internal/config/config_types.go b/internal/config/config_types.go
+index 73dacc46390..50784821b4c 100644
+--- a/internal/config/config_types.go
++++ b/internal/config/config_types.go
+@@ -456,7 +456,8 @@ type QuotaExceeded struct {
+ // RoutingConfig configures how credentials are selected for requests.
+ type RoutingConfig struct {
+ 	// Strategy selects the credential selection strategy.
+-	// Supported values: "round-robin" (default), "weighted-round-robin", "fill-first".
++	// Supported values: "round-robin" (default), "weighted-round-robin", "fill-first",
++	// "soonest-reset" (spend the credential whose weekly usage window resets soonest).
+ 	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+ 
+ 	// SessionAffinity enables universal session-sticky routing for all clients.
+diff --git a/sdk/cliproxy/auth/conductor_execution.go b/sdk/cliproxy/auth/conductor_execution.go
+index ddd4066dcaf..7b8d9777b84 100644
+--- a/sdk/cliproxy/auth/conductor_execution.go
++++ b/sdk/cliproxy/auth/conductor_execution.go
+@@ -728,7 +728,8 @@ func (m *Manager) executeCountMixedOnce(ctx context.Context, providers []string,
+ 			pickOpts = withHomeAuthCount(pickOpts, homeAuthCount)
+ 			pickOpts = withHomeExcludedAuthIDs(pickOpts, tried)
+ 		}
+-		auth, executor, provider, errPick := m.pickNextMixed(ctx, providers, routeModel, pickOpts, tried)
++		// Token counts never observe quota headers, so they must not spend a soonest-reset probe.
++		auth, executor, provider, errPick := m.pickNextMixed(withoutSoonestResetProbe(ctx), providers, routeModel, pickOpts, tried)
+ 		if errPick != nil {
+ 			if shouldReturnLastErrorOnPickFailure(homeMode, lastErr, errPick) {
+ 				return cliproxyexecutor.Response{}, preferredExecutionAttemptError(lastErr, upstreamErr)
+diff --git a/sdk/cliproxy/auth/conductor_selection.go b/sdk/cliproxy/auth/conductor_selection.go
+index da88273b5f1..309cd4f96ff 100644
+--- a/sdk/cliproxy/auth/conductor_selection.go
++++ b/sdk/cliproxy/auth/conductor_selection.go
+@@ -73,7 +73,7 @@ func (m *Manager) PluginSchedulerWantsAcrossPriorities() bool {
+ 
+ func isBuiltInSelector(selector Selector) bool {
+ 	switch selector.(type) {
+-	case *RoundRobinSelector, *WeightedRoundRobinSelector, *FillFirstSelector:
++	case *RoundRobinSelector, *WeightedRoundRobinSelector, *FillFirstSelector, *SoonestResetSelector:
+ 		return true
+ 	default:
+ 		return false
+@@ -1925,6 +1925,7 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
+ 	if !handled {
+ 		selectorCtx := selectorContextForAvailableAuths(ctx, selector, model)
+ 		selectorCtx = withSessionAffinityTransientAuthIDs(selectorCtx, transientAuthIDs)
++		selectorCtx = m.withSoonestResetFactsForSelector(selectorCtx, selector, selectorAuths)
+ 		selected, errPick = selector.Pick(selectorCtx, provider, selectionArgForSelector(selector, model), opts, selectorAuths)
+ 		if errPick != nil {
+ 			if isBuiltInSelector(selector) {
+@@ -1955,7 +1956,8 @@ func (m *Manager) SelectAuth(ctx context.Context, provider, model string, opts c
+ 	if m != nil && m.HomeEnabled() {
+ 		return nil, &Error{Code: "home_unavailable", Message: "legacy auth selection is unavailable while Home is enabled", HTTPStatus: http.StatusServiceUnavailable}
+ 	}
+-	selected, _, errPick := m.pickNextLegacy(ctx, provider, model, opts, nil)
++	// SelectAuth callers do not report results, so their picks must not spend probes.
++	selected, _, errPick := m.pickNextLegacy(withoutSoonestResetProbe(ctx), provider, model, opts, nil)
+ 	if errPick != nil {
+ 		return nil, unwrapExecutionBoundaryError(errPick)
+ 	}
+@@ -1976,7 +1978,8 @@ func (m *Manager) SelectAuthByKind(ctx context.Context, provider, model, require
+ 		return nil, &Error{Code: "invalid_auth_kind", Message: "required auth kind is invalid", HTTPStatus: http.StatusBadRequest}
+ 	}
+ 
+-	selectionCtx := withRequiredAuthKind(ctx, requiredKind)
++	// SelectAuth callers do not report results, so their picks must not spend probes.
++	selectionCtx := withoutSoonestResetProbe(withRequiredAuthKind(ctx, requiredKind))
+ 	selected, _, errPick := m.pickNextLegacy(selectionCtx, provider, model, opts, nil)
+ 	if errPick != nil {
+ 		return nil, unwrapExecutionBoundaryError(errPick)
+@@ -2002,7 +2005,7 @@ func (m *Manager) SelectAuthWithCredentialPolicy(ctx context.Context, provider,
+ 	if ctx == nil {
+ 		ctx = context.Background()
+ 	}
+-	selectionCtx := withCredentialPolicy(ctx, policy)
++	selectionCtx := withoutSoonestResetProbe(withCredentialPolicy(ctx, policy))
+ 	selected, _, errPick := m.pickNextLegacy(selectionCtx, provider, model, opts, nil)
+ 	if errPick != nil {
+ 		return nil, unwrapExecutionBoundaryError(errPick)
+@@ -2274,6 +2277,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
+ 	if !handled {
+ 		selectorCtx := selectorContextForAvailableAuths(ctx, selector, model)
+ 		selectorCtx = withSessionAffinityTransientAuthIDs(selectorCtx, transientAuthIDs)
++		selectorCtx = m.withSoonestResetFactsForSelector(selectorCtx, selector, selectorAuths)
+ 		selected, errPick = selector.Pick(selectorCtx, "mixed", selectionArgForSelector(selector, model), opts, selectorAuths)
+ 		if errPick != nil {
+ 			if isBuiltInSelector(selector) {
+diff --git a/sdk/cliproxy/auth/conductor_selection_cooldown_test.go b/sdk/cliproxy/auth/conductor_selection_cooldown_test.go
+index 95217a98704..287d804dc83 100644
+--- a/sdk/cliproxy/auth/conductor_selection_cooldown_test.go
++++ b/sdk/cliproxy/auth/conductor_selection_cooldown_test.go
+@@ -33,6 +33,7 @@ func TestBuiltInSelectorCooldownErrorPreservesRouteModel(t *testing.T) {
+ 		"round-robin":          &RoundRobinSelector{},
+ 		"weighted-round-robin": &WeightedRoundRobinSelector{},
+ 		"fill-first":           &FillFirstSelector{},
++		"soonest-reset":        &SoonestResetSelector{},
+ 	}
+ 	for name, selector := range selectors {
+ 		t.Run(name, func(t *testing.T) {
+diff --git a/sdk/cliproxy/auth/scheduler.go b/sdk/cliproxy/auth/scheduler.go
+index 752a52d7d57..7b6cb0d9f65 100644
+--- a/sdk/cliproxy/auth/scheduler.go
++++ b/sdk/cliproxy/auth/scheduler.go
+@@ -22,6 +22,7 @@ const (
+ 	schedulerStrategyRoundRobin         schedulerStrategy = 1
+ 	schedulerStrategyFillFirst          schedulerStrategy = 2
+ 	schedulerStrategyWeightedRoundRobin schedulerStrategy = 3
++	schedulerStrategySoonestReset       schedulerStrategy = 4
+ )
+ 
+ // scheduledState describes how an auth currently participates in a model shard.
+@@ -57,6 +58,8 @@ type providerScheduler struct {
+ 	providerKey string
+ 	auths       map[string]*scheduledAuthMeta
+ 	modelShards map[string]*modelScheduler
++	// soonestResetProbes records soonest-reset probe picks across this provider's shards.
++	soonestResetProbes soonestResetProbes
+ }
+ 
+ // scheduledAuthMeta stores the immutable scheduling fields derived from an auth snapshot.
+@@ -68,10 +71,14 @@ type scheduledAuthMeta struct {
+ 	websocketEnabled  bool
+ 	supportedModelSet map[string]struct{}
+ 	registryEpoch     uint64
++	// soonestReset is the parsed quota snapshot used by the soonest-reset strategy.
++	soonestReset soonestResetFacts
+ }
+ 
+ // modelScheduler tracks ready and blocked auths for one provider/model combination.
+ type modelScheduler struct {
++	// provider is the owning provider scheduler, whose auth metadata is always the freshest.
++	provider        *providerScheduler
+ 	modelKey        string
+ 	entries         map[string]*scheduledAuth
+ 	priorityOrder   []int
+@@ -170,6 +177,8 @@ func selectorStrategy(selector Selector) schedulerStrategy {
+ 		return schedulerStrategyFillFirst
+ 	case *WeightedRoundRobinSelector:
+ 		return schedulerStrategyWeightedRoundRobin
++	case *SoonestResetSelector:
++		return schedulerStrategySoonestReset
+ 	case nil, *RoundRobinSelector:
+ 		return schedulerStrategyRoundRobin
+ 	default:
+@@ -423,6 +432,9 @@ func (s *authScheduler) pickSingleWithStrategy(ctx context.Context, provider, mo
+ 	}
+ 	predicate := scheduledAuthPredicate(eligibility, tried, pinnedAuthID, strategy == schedulerStrategyWeightedRoundRobin)
+ 	if picked := shard.pickReadyLocked(preferWebsocket, strategy, predicate); picked != nil {
++		if strategy == schedulerStrategySoonestReset && soonestResetProbeAllowed(ctx) {
++			shard.recordSoonestResetProbeLocked(picked, time.Now())
++		}
+ 		return picked, nil
+ 	}
+ 	return nil, shard.unavailableErrorLocked(provider, model, predicate)
+@@ -484,6 +496,9 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
+ 		shard := providerState.ensureModelLocked(modelKey, time.Now())
+ 		predicate := scheduledAuthPredicate(eligibility, tried, pinnedAuthID, strategy == schedulerStrategyWeightedRoundRobin)
+ 		if picked := shard.pickReadyLocked(false, strategy, predicate); picked != nil {
++			if strategy == schedulerStrategySoonestReset && soonestResetProbeAllowed(ctx) {
++				shard.recordSoonestResetProbeLocked(picked, time.Now())
++			}
+ 			return picked, providerKey, nil
+ 		}
+ 		return nil, "", shard.unavailableErrorLocked("mixed", model, predicate)
+@@ -531,6 +546,40 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
+ 		return nil, "", s.mixedUnavailableErrorLocked(normalized, model, predicate)
+ 	}
+ 
++	if strategy == schedulerStrategySoonestReset {
++		// Rank across every provider, like the legacy selector, which sees all candidates.
++		var best *scheduledAuth
++		var bestShard *modelScheduler
++		var bestRank soonestResetRank
++		for _, shard := range candidateShards {
++			if shard == nil {
++				continue
++			}
++			bucket := shard.readyByPriority[bestPriority]
++			if bucket == nil {
++				continue
++			}
++			for _, entry := range bucket.all.flat {
++				if entry == nil || entry.auth == nil || entry.meta == nil || !predicate(entry) {
++					continue
++				}
++				rank := shard.soonestResetRankLocked(entry, now)
++				if best == nil || soonestResetPrefers(rank, entry.auth.ID, bestRank, best.auth.ID) {
++					best = entry
++					bestShard = shard
++					bestRank = rank
++				}
++			}
++		}
++		if best != nil {
++			if soonestResetProbeAllowed(ctx) {
++				bestShard.recordSoonestResetProbeLocked(best.auth, now)
++			}
++			return best.auth, best.meta.providerKey, nil
++		}
++		return nil, "", s.mixedUnavailableErrorLocked(normalized, model, predicate)
++	}
++
+ 	cursorKey := strings.Join(normalized, ",") + ":" + modelKey
+ 	if strategy == schedulerStrategyWeightedRoundRobin {
+ 		entries := make([]*scheduledAuth, 0)
+@@ -840,6 +889,9 @@ func (s *authScheduler) upsertAuthRebuildLocked(auth *Auth, existingMetas map[st
+ 	providerState := s.ensureProviderLocked(providerKey)
+ 	regEpoch := registry.GetGlobalRegistry().ClientRegistrationEpoch(authID)
+ 	meta := buildScheduledAuthMetaWithModelSet(authToSchedule, supportedModelSetForAuth(authToSchedule.ID), regEpoch)
++	if previous := existingMetas[authID]; previous != nil {
++		meta.soonestReset = meta.soonestReset.carry(previous.soonestReset)
++	}
+ 	s.authProviders[authID] = providerKey
+ 	providerState.upsertAuthForModelsLocked(meta, nil, true, now)
+ }
+@@ -1059,6 +1111,7 @@ func buildScheduledAuthMetaWithModelSet(auth *Auth, modelSet map[string]struct{}
+ 		websocketEnabled:  authWebsocketsEnabled(auth),
+ 		supportedModelSet: modelSet,
+ 		registryEpoch:     regEpoch,
++		soonestReset:      soonestResetFactsFor(auth),
+ 	}
+ }
+ 
+@@ -1096,6 +1149,9 @@ func (p *providerScheduler) upsertAuthForModelsLocked(meta *scheduledAuthMeta, t
+ 	if p == nil || meta == nil || meta.auth == nil {
+ 		return
+ 	}
++	if previous := p.auths[meta.auth.ID]; previous != nil && previous != meta {
++		meta.soonestReset = meta.soonestReset.carry(previous.soonestReset)
++	}
+ 	p.auths[meta.auth.ID] = meta
+ 	if credentialScoped || len(targetModels) == 0 {
+ 		for modelKey, shard := range p.modelShards {
+@@ -1172,6 +1228,7 @@ func (p *providerScheduler) ensureModelLocked(modelKey string, now time.Time) *m
+ 		return shard
+ 	}
+ 	shard := &modelScheduler{
++		provider:        p,
+ 		modelKey:        modelKey,
+ 		entries:         make(map[string]*scheduledAuth),
+ 		readyByPriority: make(map[int]*readyBucket),
+@@ -1384,6 +1441,8 @@ func (m *modelScheduler) pickReadyAtPriorityLocked(preferWebsocket bool, priorit
+ 		picked = view.pickFirst(predicate)
+ 	case schedulerStrategyWeightedRoundRobin:
+ 		picked = view.pickWeighted(predicate)
++	case schedulerStrategySoonestReset:
++		picked = m.pickSoonestResetLocked(view, predicate, time.Now())
+ 	default:
+ 		picked = view.pickRoundRobin(predicate)
+ 	}
+@@ -1685,6 +1744,84 @@ func scheduledSuccessorIndex(entries []*scheduledAuth, lastID string) int {
+ 	return index
+ }
+ 
++// soonestResetFacts returns the soonest-reset facts recorded for ids; ids the scheduler does
++// not track are omitted.
++func (s *authScheduler) soonestResetFacts(ids []string) map[string]soonestResetFacts {
++	if s == nil || len(ids) == 0 {
++		return nil
++	}
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	facts := make(map[string]soonestResetFacts, len(ids))
++	for _, id := range ids {
++		providerState := s.providers[s.authProviders[id]]
++		if providerState == nil {
++			continue
++		}
++		if meta := providerState.auths[id]; meta != nil {
++			facts[id] = meta.soonestReset
++		}
++	}
++	return facts
++}
++
++// pickSoonestResetLocked returns the ready entry in view whose weekly usage window resets
++// soonest. Ranks are computed at pick time because quota snapshots change on every result
++// without reordering the view; the view is ID-sorted, so equal ranks resolve to the lowest
++// ID. Callers record probe picks with recordSoonestResetProbeLocked.
++func (m *modelScheduler) pickSoonestResetLocked(view *readyView, predicate func(*scheduledAuth) bool, now time.Time) *scheduledAuth {
++	var best *scheduledAuth
++	var bestRank soonestResetRank
++	for _, entry := range view.flat {
++		if entry == nil || entry.auth == nil {
++			continue
++		}
++		if predicate != nil && !predicate(entry) {
++			continue
++		}
++		rank := m.soonestResetRankLocked(entry, now)
++		if best == nil || rank.less(bestRank) {
++			best = entry
++			bestRank = rank
++		}
++	}
++	return best
++}
++
++// soonestResetRankLocked ranks entry from the freshest snapshot of its auth. Targeted result
++// updates refresh only the result's model shards, so other shards can hold an older entry,
++// while the provider-level metadata is replaced on every update.
++func (m *modelScheduler) soonestResetRankLocked(entry *scheduledAuth, now time.Time) soonestResetRank {
++	meta := entry.meta
++	var probes soonestResetProbes
++	if m != nil && m.provider != nil {
++		if fresh := m.provider.auths[entry.auth.ID]; fresh != nil {
++			meta = fresh
++		}
++		probes = m.provider.soonestResetProbes
++	}
++	var facts soonestResetFacts
++	if meta != nil {
++		facts = meta.soonestReset
++	} else {
++		facts = soonestResetFactsFor(entry.auth)
++	}
++	return facts.rank(now, probes.pending(entry.auth.ID, now))
++}
++
++// recordSoonestResetProbeLocked notes the pick of auth as a soonest-reset probe when it ranks
++// as one, so concurrent picks skip it while its response is pending.
++func (m *modelScheduler) recordSoonestResetProbeLocked(auth *Auth, now time.Time) {
++	if m == nil || m.provider == nil || auth == nil {
++		return
++	}
++	entry := m.entries[auth.ID]
++	if entry == nil || entry.auth == nil || m.soonestResetRankLocked(entry, now).class != soonestResetClassProbe {
++		return
++	}
++	m.provider.soonestResetProbes.record(auth.ID, now)
++}
++
+ // pickWeighted returns the next ready entry using smooth weighted round-robin.
+ func (v *readyView) pickWeighted(predicate func(*scheduledAuth) bool) *scheduledAuth {
+ 	if v == nil || len(v.flat) == 0 {
+diff --git a/sdk/cliproxy/auth/selector.go b/sdk/cliproxy/auth/selector.go
+index fc7805413a6..aabb68d681a 100644
+--- a/sdk/cliproxy/auth/selector.go
++++ b/sdk/cliproxy/auth/selector.go
+@@ -71,6 +71,19 @@ func weightedSelectorStateModel(ctx context.Context, availabilityModel string) s
+ // rolling-window subscription caps (e.g. chat message limits).
+ type FillFirstSelector struct{}
+ 
++// SoonestResetSelector spends the credential whose weekly usage window resets soonest, so
++// subscription quota that would expire unused is consumed first. It ranks credentials by
++// their latest quota snapshot that reported usage windows (Claude and Codex response
++// headers, Devin status refreshes): usable before used-up, then a subscription whose weekly
++// reset is not known yet (one probe request learns it), then known resets earliest first,
++// then other subscriptions, then credentials with no weekly window to learn. Equal ranks
++// resolve to the lowest ID, as fill-first. Picks made through a Manager rank from the facts
++// its scheduler records as results arrive; other picks rank each candidate's own snapshot.
++type SoonestResetSelector struct {
++	mu     sync.Mutex
++	probes soonestResetProbes
++}
++
+ type blockReason int
+ 
+ const (
+@@ -820,6 +833,20 @@ func (s *FillFirstSelector) Pick(ctx context.Context, provider, model string, op
+ 	return available[0], nil
+ }
+ 
++// Pick selects the available auth whose weekly usage window resets soonest.
++func (s *SoonestResetSelector) Pick(ctx context.Context, provider, model string, opts cliproxyexecutor.Options, auths []*Auth) (*Auth, error) {
++	_ = opts
++	now := time.Now()
++	available, err := getSelectorAvailableAuths(ctx, auths, provider, model, now)
++	if err != nil {
++		return nil, err
++	}
++	available = preferCodexWebsocketAuths(ctx, provider, available)
++	s.mu.Lock()
++	defer s.mu.Unlock()
++	return pickSoonestResetAuth(available, now, soonestResetFactsFromContext(ctx), &s.probes, soonestResetProbeAllowed(ctx)), nil
++}
++
+ func isAuthBlockedForModel(auth *Auth, model string, now time.Time) (bool, blockReason, time.Time) {
+ 	if auth == nil {
+ 		return true, blockReasonOther, time.Time{}
+diff --git a/sdk/cliproxy/auth/soonest_reset.go b/sdk/cliproxy/auth/soonest_reset.go
+new file mode 100644
+index 00000000000..77e23b70520
+--- /dev/null
++++ b/sdk/cliproxy/auth/soonest_reset.go
+@@ -0,0 +1,487 @@
++package auth
++
++import (
++	"context"
++	"math"
++	"strconv"
++	"strings"
++	"time"
++)
++
++// Ranking classes for the soonest-reset strategy, best first.
++const (
++	// soonestResetClassProbe is a subscription whose weekly reset is not known yet and has no
++	// probe pending: no snapshot since start reported usage windows, or its weekly window
++	// rolled over. One request usually learns the reset, because every response that
++	// carries quota headers replaces the quota snapshot.
++	soonestResetClassProbe = iota
++	// soonestResetClassKnown is a credential whose weekly window reset is known and ahead.
++	soonestResetClassKnown
++	// soonestResetClassSubscription is a subscription without a known weekly reset: its probe
++	// is pending, or its plan reports usage windows but no weekly one.
++	soonestResetClassSubscription
++	// soonestResetClassOther is a credential with no weekly reset to learn: API keys and
++	// providers without quota observation.
++	soonestResetClassOther
++)
++
++const (
++	quotaWindowWeek = 7 * 24 * time.Hour
++	quotaWindowDay  = 24 * time.Hour
++	// quotaWindowFallback bounds a used-up window that reports neither reset nor length.
++	quotaWindowFallback = 5 * time.Hour
++	// maxQuotaSignalSeconds bounds numeric signals (about 31 years in seconds).
++	maxQuotaSignalSeconds = 1e9
++	// soonestResetProbeHold is how long a probe pick reserves a credential: other picks rank
++	// it as a pending subscription meanwhile, so concurrent requests do not pile onto it
++	// before its response (for streams, the end of the stream) records the reset.
++	soonestResetProbeHold = 5 * time.Minute
++)
++
++// soonestResetFacts is what a credential's quota snapshot says, independent of the clock.
++type soonestResetFacts struct {
++	// subscription reports that a request can teach the weekly reset: Claude and Codex
++	// subscription responses carry it in quota headers.
++	subscription bool
++	// learnable reports that the snapshot does not settle the weekly reset: nothing was
++	// observed, no usage window was reported, or the weekly window came without a reset.
++	learnable bool
++	// windowed reports that the snapshot reported at least one usage window.
++	windowed bool
++	// weeklyReset is the reported weekly window reset; zero when unknown.
++	weeklyReset time.Time
++	// exhaustedUntil is when the latest used-up usage window ends; zero when none is used up.
++	exhaustedUntil time.Time
++}
++
++// soonestResetRank orders credentials for the soonest-reset strategy.
++type soonestResetRank struct {
++	// exhausted reports that an observed usage window is used up and has not reset yet.
++	exhausted   bool
++	class       int
++	weeklyReset time.Time
++}
++
++// soonestResetFactsFor parses the credential-level quota snapshot, which holds the latest
++// observation from any model.
++func soonestResetFactsFor(auth *Auth) soonestResetFacts {
++	if auth == nil {
++		return soonestResetFacts{}
++	}
++	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
++	observedAt := auth.Quota.ObservedAt
++	weekly, hasWeekly, windows := quotaWindowsFor(provider, auth.Quota)
++	facts := soonestResetFacts{subscription: soonestResetSubscription(provider, auth)}
++	if hasWeekly {
++		facts.weeklyReset = weekly.reset
++		windows = append(windows, weekly)
++	}
++	for _, window := range windows {
++		if until := window.exhaustedUntil(observedAt); until.After(facts.exhaustedUntil) {
++			facts.exhaustedUntil = until
++		}
++	}
++	if len(windows) == 0 && provider == "claude" {
++		facts.exhaustedUntil = claudeUnifiedRejectionEnd(auth.Quota.Signals, observedAt)
++	}
++	facts.windowed = len(windows) > 0
++	facts.learnable = facts.subscription &&
++		(observedAt.IsZero() || !facts.windowed || (hasWeekly && weekly.reset.IsZero()))
++	return facts
++}
++
++// carry returns f, or previous when f reports no usage window but previous does. Such a
++// snapshot says nothing about the windows: Claude's request-scoped fast-mode credit refusal,
++// for example, carries unified quota headers without any window, and must not make a
++// credential whose weekly reset is known rank as unknown. A rejection without windows still
++// keeps the credential used up until it ends.
++func (f soonestResetFacts) carry(previous soonestResetFacts) soonestResetFacts {
++	if f.windowed || !previous.windowed || f.subscription != previous.subscription {
++		return f
++	}
++	if f.exhaustedUntil.After(previous.exhaustedUntil) {
++		previous.exhaustedUntil = f.exhaustedUntil
++	}
++	return previous
++}
++
++// rank ranks the facts at now. probePending reports a recent probe pick of the credential.
++func (f soonestResetFacts) rank(now time.Time, probePending bool) soonestResetRank {
++	rank := soonestResetRank{exhausted: f.exhaustedUntil.After(now), class: soonestResetClassOther}
++	switch {
++	case f.weeklyReset.After(now):
++		rank.class = soonestResetClassKnown
++		rank.weeklyReset = f.weeklyReset
++	case !f.subscription:
++		// Nothing to learn: API keys and providers without quota observation.
++	case (f.learnable || !f.weeklyReset.IsZero()) && !probePending:
++		// A weekly reset that passed means the window rolled over since it was observed.
++		rank.class = soonestResetClassProbe
++	default:
++		rank.class = soonestResetClassSubscription
++	}
++	return rank
++}
++
++// less reports whether r ranks strictly before other: usable before used-up credentials,
++// then by class, then known weekly resets earliest first.
++func (r soonestResetRank) less(other soonestResetRank) bool {
++	if r.exhausted != other.exhausted {
++		return !r.exhausted
++	}
++	if r.class != other.class {
++		return r.class < other.class
++	}
++	if r.class == soonestResetClassKnown && !r.weeklyReset.Equal(other.weeklyReset) {
++		return r.weeklyReset.Before(other.weeklyReset)
++	}
++	return false
++}
++
++// soonestResetPrefers reports whether a candidate ranked rank with ID id should replace the
++// current best. Equal ranks resolve to the lowest ID, matching fill-first.
++func soonestResetPrefers(rank soonestResetRank, id string, best soonestResetRank, bestID string) bool {
++	if rank.less(best) {
++		return true
++	}
++	return !best.less(rank) && id < bestID
++}
++
++// soonestResetProbes records when credentials were last picked to learn their weekly reset.
++type soonestResetProbes map[string]time.Time
++
++type soonestResetProbeSuppressedKey struct{}
++
++// withoutSoonestResetProbe marks picks whose results never record quota observations, such as
++// token counts and SelectAuth callers, so they do not spend a soonest-reset probe.
++func withoutSoonestResetProbe(ctx context.Context) context.Context {
++	if ctx == nil {
++		ctx = context.Background()
++	}
++	return context.WithValue(ctx, soonestResetProbeSuppressedKey{}, true)
++}
++
++// soonestResetProbeAllowed reports whether a pick made with ctx may record a probe.
++func soonestResetProbeAllowed(ctx context.Context) bool {
++	if ctx == nil {
++		return true
++	}
++	suppressed, _ := ctx.Value(soonestResetProbeSuppressedKey{}).(bool)
++	return !suppressed
++}
++
++// pending reports whether a probe pick of id is recent enough to still await its response.
++func (p soonestResetProbes) pending(id string, now time.Time) bool {
++	pickedAt, ok := p[id]
++	return ok && now.Sub(pickedAt) < soonestResetProbeHold
++}
++
++// record notes a probe pick of id, dropping expired entries so the map stays bounded by the
++// number of credentials probed within one hold.
++func (p *soonestResetProbes) record(id string, now time.Time) {
++	if *p == nil {
++		*p = make(soonestResetProbes)
++	}
++	for key, pickedAt := range *p {
++		if now.Sub(pickedAt) >= soonestResetProbeHold {
++			delete(*p, key)
++		}
++	}
++	(*p)[id] = now
++}
++
++type soonestResetFactsKey struct{}
++
++// withSoonestResetFacts hands the soonest-reset selector facts by auth ID that were recorded
++// as results arrived.
++func withSoonestResetFacts(ctx context.Context, facts map[string]soonestResetFacts) context.Context {
++	if ctx == nil {
++		ctx = context.Background()
++	}
++	return context.WithValue(ctx, soonestResetFactsKey{}, facts)
++}
++
++func soonestResetFactsFromContext(ctx context.Context) map[string]soonestResetFacts {
++	if ctx == nil {
++		return nil
++	}
++	facts, _ := ctx.Value(soonestResetFactsKey{}).(map[string]soonestResetFacts)
++	return facts
++}
++
++// selectorUsesSoonestReset reports whether selector picks with SoonestResetSelector, alone
++// or as the session affinity fallback.
++func selectorUsesSoonestReset(selector Selector) bool {
++	switch s := selector.(type) {
++	case *SoonestResetSelector:
++		return true
++	case *SessionAffinitySelector:
++		_, ok := s.fallback.(*SoonestResetSelector)
++		return ok
++	default:
++		return false
++	}
++}
++
++// withSoonestResetFactsForSelector hands a soonest-reset selector the scheduler's facts for
++// auths. The scheduler records them as results arrive and carries them across snapshots
++// without usage windows; the selector sees snapshots only when it picks, and session
++// affinity serves most requests without a pick.
++func (m *Manager) withSoonestResetFactsForSelector(ctx context.Context, selector Selector, auths []*Auth) context.Context {
++	if m == nil || m.scheduler == nil || !selectorUsesSoonestReset(selector) {
++		return ctx
++	}
++	ids := make([]string, 0, len(auths))
++	for _, auth := range auths {
++		if auth != nil {
++			ids = append(ids, auth.ID)
++		}
++	}
++	return withSoonestResetFacts(ctx, m.scheduler.soonestResetFacts(ids))
++}
++
++// pickSoonestResetAuth returns the auth whose weekly usage window resets soonest, ranking an
++// auth by its facts in known when present, else by its own snapshot. Pending probes in
++// probes, when given, are respected; a pick that probes an unknown reset is recorded there
++// when recordProbe is set.
++func pickSoonestResetAuth(auths []*Auth, now time.Time, known map[string]soonestResetFacts, probes *soonestResetProbes, recordProbe bool) *Auth {
++	var pending soonestResetProbes
++	if probes != nil {
++		pending = *probes
++	}
++	var best *Auth
++	var bestRank soonestResetRank
++	for _, candidate := range auths {
++		if candidate == nil {
++			continue
++		}
++		facts, ok := known[candidate.ID]
++		if !ok {
++			facts = soonestResetFactsFor(candidate)
++		}
++		rank := facts.rank(now, pending.pending(candidate.ID, now))
++		if best == nil || soonestResetPrefers(rank, candidate.ID, bestRank, best.ID) {
++			best = candidate
++			bestRank = rank
++		}
++	}
++	if best != nil && probes != nil && recordProbe && bestRank.class == soonestResetClassProbe {
++		probes.record(best.ID, now)
++	}
++	return best
++}
++
++// soonestResetSubscription reports whether a request can teach the credential's weekly reset,
++// mirroring how the executors decide that a credential bills a subscription.
++func soonestResetSubscription(provider string, auth *Auth) bool {
++	switch provider {
++	case "claude":
++		apiKey := strings.TrimSpace(auth.Attributes[AttributeAPIKey])
++		if strings.Contains(apiKey, "sk-ant-oat") {
++			// Claude setup tokens configured as API keys are sent as subscription OAuth.
++			return true
++		}
++		return apiKey == "" && auth.AuthKind() != AuthKindAPIKey
++	case "codex":
++		return auth.AuthKind() != AuthKindAPIKey
++	default:
++		return false
++	}
++}
++
++// quotaWindow is one usage window read from quota signals; each part may be missing.
++type quotaWindow struct {
++	usedUp bool
++	reset  time.Time
++	length time.Duration
++}
++
++// exhaustedUntil reports until when a used-up window holds: its reset, else its length (or
++// quotaWindowFallback) after the observation. It is zero when the window is not used up.
++func (w quotaWindow) exhaustedUntil(observedAt time.Time) time.Time {
++	if !w.usedUp {
++		return time.Time{}
++	}
++	if !w.reset.IsZero() {
++		return w.reset
++	}
++	if observedAt.IsZero() {
++		return time.Time{}
++	}
++	length := w.length
++	if length <= 0 {
++		length = quotaWindowFallback
++	}
++	return observedAt.Add(length)
++}
++
++// quotaWindowsFor reads the weekly window, when reported, plus the other usage windows from a
++// quota snapshot. Unknown providers report nothing.
++func quotaWindowsFor(provider string, quota QuotaState) (weekly quotaWindow, hasWeekly bool, others []quotaWindow) {
++	if len(quota.Signals) == 0 {
++		return quotaWindow{}, false, nil
++	}
++	switch provider {
++	case "claude":
++		return claudeQuotaWindows(quota.Signals)
++	case "codex":
++		return codexQuotaWindows(quota)
++	case "devin":
++		return devinQuotaWindows(quota.Signals)
++	default:
++		return quotaWindow{}, false, nil
++	}
++}
++
++// claudeQuotaWindows reads the shared 7-day and 5-hour unified windows. Keys are canonical
++// header names because collectQuotaSignals canonicalizes them.
++func claudeQuotaWindows(signals map[string]string) (quotaWindow, bool, []quotaWindow) {
++	read := func(label string, length time.Duration) (quotaWindow, bool) {
++		prefix := "Anthropic-Ratelimit-Unified-" + label + "-"
++		status := strings.TrimSpace(signals[prefix+"Status"])
++		utilization, hasUtilization := quotaSignalNumber(signals, prefix+"Utilization")
++		reset, hasReset := parseQuotaResetTime(signals[prefix+"Reset"])
++		if status == "" && !hasUtilization && !hasReset {
++			return quotaWindow{}, false
++		}
++		return quotaWindow{
++			usedUp: strings.EqualFold(status, "rejected") || (hasUtilization && utilization >= 1),
++			reset:  reset,
++			length: length,
++		}, true
++	}
++	weekly, hasWeekly := read("7d", quotaWindowWeek)
++	var others []quotaWindow
++	if short, ok := read("5h", 5*time.Hour); ok {
++		others = append(others, short)
++	}
++	return weekly, hasWeekly, others
++}
++
++// claudeUnifiedRejectionEnd reports until when a unified rejection that names no usage window
++// holds: the unified reset, else the representative claim's window length (or
++// quotaWindowFallback) after the observation. Overage rejections say nothing about the
++// subscription windows, so they, like snapshots without a rejection, report zero.
++func claudeUnifiedRejectionEnd(signals map[string]string, observedAt time.Time) time.Time {
++	if !strings.EqualFold(strings.TrimSpace(signals["Anthropic-Ratelimit-Unified-Status"]), "rejected") {
++		return time.Time{}
++	}
++	claim := strings.ToLower(strings.TrimSpace(signals["Anthropic-Ratelimit-Unified-Representative-Claim"]))
++	if strings.Contains(claim, "overage") {
++		return time.Time{}
++	}
++	window := quotaWindow{usedUp: true}
++	window.reset, _ = parseQuotaResetTime(signals["Anthropic-Ratelimit-Unified-Reset"])
++	switch claim {
++	case "five_hour":
++		window.length = 5 * time.Hour
++	case "seven_day":
++		window.length = quotaWindowWeek
++	}
++	return window.exhaustedUntil(observedAt)
++}
++
++// codexQuotaWindows reads the main primary and secondary windows. The weekly window is
++// whichever is longer, since plans differ in which header carries it; a window without a
++// length loses only to one at least a day long, so without lengths secondary is weekly.
++// Additional-limit namespaces (X-Codex-<name>-...) are ignored.
++func codexQuotaWindows(quota QuotaState) (quotaWindow, bool, []quotaWindow) {
++	read := func(label string) (quotaWindow, bool) {
++		prefix := "X-Codex-" + label + "-"
++		used, hasUsed := quotaSignalNumber(quota.Signals, prefix+"Used-Percent")
++		reset, hasReset := parseQuotaResetTime(quota.Signals[prefix+"Reset-At"])
++		if !hasReset {
++			if after, ok := quotaSignalNumber(quota.Signals, prefix+"Reset-After-Seconds"); ok && after >= 0 && !quota.ObservedAt.IsZero() {
++				// A zero delay ends the window at the observation but states no real reset.
++				reset = quota.ObservedAt.Add(time.Duration(after * float64(time.Second)))
++				hasReset = after > 0
++			}
++		}
++		var length time.Duration
++		if minutes, ok := quotaSignalNumber(quota.Signals, prefix+"Window-Minutes"); ok && minutes > 0 && minutes*60 <= maxQuotaSignalSeconds {
++			length = time.Duration(minutes * float64(time.Minute))
++		}
++		// A zero-filled window (no length, no reset, nothing used) is a placeholder for a
++		// window the plan does not have.
++		if !hasReset && length <= 0 && (!hasUsed || used <= 0) {
++			return quotaWindow{}, false
++		}
++		return quotaWindow{usedUp: hasUsed && used >= 100, reset: reset, length: length}, true
++	}
++	primary, hasPrimary := read("Primary")
++	secondary, hasSecondary := read("Secondary")
++	var weekly quotaWindow
++	var others []quotaWindow
++	switch {
++	case hasPrimary && hasSecondary:
++		weekly, others = secondary, []quotaWindow{primary}
++		if primary.length > secondary.length && (secondary.length > 0 || primary.length >= quotaWindowDay) {
++			weekly, others = primary, []quotaWindow{secondary}
++		}
++	case hasPrimary:
++		weekly = primary
++	case hasSecondary:
++		weekly = secondary
++	default:
++		return quotaWindow{}, false, nil
++	}
++	// A known length must be at least a day; without a length, a lone primary is the short
++	// window and anything else counts as weekly.
++	if (weekly.length > 0 && weekly.length < quotaWindowDay) || (weekly.length <= 0 && hasPrimary && !hasSecondary) {
++		return quotaWindow{}, false, append(others, weekly)
++	}
++	return weekly, true, others
++}
++
++// devinQuotaWindows reads the weekly and daily windows that Devin status refreshes poll.
++func devinQuotaWindows(signals map[string]string) (quotaWindow, bool, []quotaWindow) {
++	read := func(period string, length time.Duration) (quotaWindow, bool) {
++		remaining, hasRemaining := quotaSignalNumber(signals, period+"_quota_remaining_percent")
++		reset, hasReset := parseQuotaResetTime(signals[period+"_quota_reset_at"])
++		if !hasRemaining && !hasReset {
++			return quotaWindow{}, false
++		}
++		return quotaWindow{usedUp: hasRemaining && remaining <= 0, reset: reset, length: length}, true
++	}
++	weekly, hasWeekly := read("weekly", quotaWindowWeek)
++	var others []quotaWindow
++	if daily, ok := read("daily", quotaWindowDay); ok {
++		others = append(others, daily)
++	}
++	return weekly, hasWeekly, others
++}
++
++// quotaSignalNumber parses a finite numeric signal, tolerating a trailing percent sign.
++// Values beyond maxQuotaSignalSeconds are rejected so durations derived from them cannot
++// overflow.
++func quotaSignalNumber(signals map[string]string, key string) (float64, bool) {
++	raw := strings.TrimSuffix(strings.TrimSpace(signals[key]), "%")
++	if raw == "" {
++		return 0, false
++	}
++	value, errParse := strconv.ParseFloat(strings.TrimSpace(raw), 64)
++	if errParse != nil || math.IsNaN(value) || math.Abs(value) > maxQuotaSignalSeconds {
++		return 0, false
++	}
++	return value, true
++}
++
++// parseQuotaResetTime parses a reset signal given as epoch seconds (fractions allowed) or
++// as an RFC 3339 time.
++func parseQuotaResetTime(raw string) (time.Time, bool) {
++	raw = strings.TrimSpace(raw)
++	if raw == "" {
++		return time.Time{}, false
++	}
++	if seconds, errParse := strconv.ParseFloat(raw, 64); errParse == nil {
++		if math.IsNaN(seconds) || seconds <= 0 || seconds > 1e12 {
++			return time.Time{}, false
++		}
++		whole := int64(seconds)
++		return time.Unix(whole, int64((seconds-float64(whole))*float64(time.Second))), true
++	}
++	if parsed, errParse := time.Parse(time.RFC3339, raw); errParse == nil {
++		return parsed, true
++	}
++	return time.Time{}, false
++}
+diff --git a/sdk/cliproxy/auth/soonest_reset_test.go b/sdk/cliproxy/auth/soonest_reset_test.go
+new file mode 100644
+index 00000000000..597bc0a42c1
+--- /dev/null
++++ b/sdk/cliproxy/auth/soonest_reset_test.go
+@@ -0,0 +1,1259 @@
++package auth
++
++import (
++	"context"
++	"net/http"
++	"strconv"
++	"sync"
++	"testing"
++	"time"
++
++	internallogging "github.com/router-for-me/CLIProxyAPI/v8/internal/logging"
++	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
++	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
++)
++
++var soonestResetTestNow = time.Date(2026, time.October, 25, 12, 0, 0, 0, time.UTC)
++
++func epochSignal(t time.Time) string {
++	return strconv.FormatInt(t.Unix(), 10)
++}
++
++// claudeSubscription builds a Claude OAuth credential observed at observedAt with signals.
++func claudeSubscription(id string, observedAt time.Time, signals map[string]string) *Auth {
++	return &Auth{
++		ID:       id,
++		Provider: "claude",
++		Metadata: map[string]any{"access_token": "token-" + id},
++		Quota:    QuotaState{ObservedAt: observedAt, Signals: signals},
++	}
++}
++
++// claudeWeeklySignals is a healthy unified snapshot taken at now with the given weekly reset.
++func claudeWeeklySignals(now, reset time.Time) map[string]string {
++	return map[string]string{
++		"Anthropic-Ratelimit-Unified-5h-Status":      "allowed",
++		"Anthropic-Ratelimit-Unified-5h-Utilization": "0.1",
++		"Anthropic-Ratelimit-Unified-5h-Reset":       epochSignal(now.Add(2 * time.Hour)),
++		"Anthropic-Ratelimit-Unified-7d-Status":      "allowed",
++		"Anthropic-Ratelimit-Unified-7d-Utilization": "0.4",
++		"Anthropic-Ratelimit-Unified-7d-Reset":       epochSignal(reset),
++	}
++}
++
++func codexSubscription(id string, observedAt time.Time, signals map[string]string) *Auth {
++	return &Auth{
++		ID:       id,
++		Provider: "codex",
++		Metadata: map[string]any{"access_token": "token-" + id},
++		Quota:    QuotaState{ObservedAt: observedAt, Signals: signals},
++	}
++}
++
++type soonestResetRankCase struct {
++	name      string
++	auth      *Auth
++	wantClass int
++	wantReset time.Time
++	exhausted bool
++}
++
++func checkSoonestResetRanks(t *testing.T, now time.Time, tests []soonestResetRankCase) {
++	t.Helper()
++	for _, test := range tests {
++		t.Run(test.name, func(t *testing.T) {
++			t.Parallel()
++			rank := soonestResetFactsFor(test.auth).rank(now, false)
++			if rank.class != test.wantClass {
++				t.Fatalf("class = %d, want %d", rank.class, test.wantClass)
++			}
++			if !rank.weeklyReset.Equal(test.wantReset) {
++				t.Fatalf("weekly reset = %v, want %v", rank.weeklyReset, test.wantReset)
++			}
++			if rank.exhausted != test.exhausted {
++				t.Fatalf("exhausted = %v, want %v", rank.exhausted, test.exhausted)
++			}
++		})
++	}
++}
++
++func TestSoonestResetRankClaude(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	observed := now.Add(-time.Minute)
++	checkSoonestResetRanks(t, now, []soonestResetRankCase{
++		{
++			name:      "known weekly reset",
++			auth:      claudeSubscription("a", observed, claudeWeeklySignals(now, now.Add(48*time.Hour))),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(48 * time.Hour),
++		},
++		{
++			name:      "never observed subscription is probed",
++			auth:      claudeSubscription("a", time.Time{}, nil),
++			wantClass: soonestResetClassProbe,
++		},
++		{
++			name:      "rolled over weekly window is probed again",
++			auth:      claudeSubscription("a", now.Add(-8*24*time.Hour), claudeWeeklySignals(now.Add(-8*24*time.Hour), now.Add(-time.Hour))),
++			wantClass: soonestResetClassProbe,
++		},
++		{
++			// A per-minute 429 replaces the snapshot without any usage window (Issue #6720 shape).
++			name: "rate limit snapshot without usage windows is probed",
++			auth: claudeSubscription("a", observed, map[string]string{
++				"Retry-After":                       "30",
++				"Anthropic-Ratelimit-Unified-Reset": epochSignal(now.Add(time.Minute)),
++			}),
++			wantClass: soonestResetClassProbe,
++		},
++		{
++			// An overage rejection can report the weekly window without its reset (Issue #5915 shape).
++			name: "weekly window without a reset is probed",
++			auth: claudeSubscription("a", observed, map[string]string{
++				"Anthropic-Ratelimit-Unified-7d-Status":      "allowed",
++				"Anthropic-Ratelimit-Unified-7d-Utilization": "0.69",
++			}),
++			wantClass: soonestResetClassProbe,
++		},
++		{
++			name: "plan reporting only a five hour window is a subscription without weekly reset",
++			auth: claudeSubscription("a", observed, map[string]string{
++				"Anthropic-Ratelimit-Unified-5h-Utilization": "0.2",
++				"Anthropic-Ratelimit-Unified-5h-Reset":       epochSignal(now.Add(time.Hour)),
++			}),
++			wantClass: soonestResetClassSubscription,
++		},
++		{
++			name: "api key never probes",
++			auth: &Auth{
++				ID:         "a",
++				Provider:   "claude",
++				Attributes: map[string]string{AttributeAPIKey: "sk-ant-api03-test"},
++			},
++			wantClass: soonestResetClassOther,
++		},
++		{
++			name: "setup token configured as api key is a subscription",
++			auth: &Auth{
++				ID:         "a",
++				Provider:   "claude",
++				Attributes: map[string]string{AttributeAPIKey: "sk-ant-oat01-test", AttributeAuthKind: AuthKindAPIKey},
++			},
++			wantClass: soonestResetClassProbe,
++		},
++		{
++			name: "rejected weekly window is exhausted",
++			auth: claudeSubscription("a", observed, map[string]string{
++				"Anthropic-Ratelimit-Unified-7d-Status": "rejected",
++				"Anthropic-Ratelimit-Unified-7d-Reset":  epochSignal(now.Add(24 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++			exhausted: true,
++		},
++		{
++			name: "rejected weekly window without a reset stays exhausted for its length",
++			auth: claudeSubscription("a", now.Add(-24*time.Hour), map[string]string{
++				"Anthropic-Ratelimit-Unified-7d-Status": "rejected",
++			}),
++			wantClass: soonestResetClassProbe,
++			exhausted: true,
++		},
++		{
++			name: "used up five hour window is exhausted until its reset",
++			auth: claudeSubscription("a", observed, map[string]string{
++				"Anthropic-Ratelimit-Unified-5h-Utilization": "1.0",
++				"Anthropic-Ratelimit-Unified-5h-Reset":       epochSignal(now.Add(time.Hour)),
++				"Anthropic-Ratelimit-Unified-7d-Reset":       epochSignal(now.Add(24 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++			exhausted: true,
++		},
++		{
++			// Observed 2h ago, so observation plus the 5h length is still ahead: only the
++			// stated reset, which passed, makes the window usable again.
++			name: "used up window whose stated reset passed is usable",
++			auth: claudeSubscription("a", now.Add(-2*time.Hour), map[string]string{
++				"Anthropic-Ratelimit-Unified-5h-Utilization": "1.0",
++				"Anthropic-Ratelimit-Unified-5h-Reset":       epochSignal(now.Add(-time.Hour)),
++				"Anthropic-Ratelimit-Unified-7d-Reset":       epochSignal(now.Add(24 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++		},
++	})
++}
++
++func TestSoonestResetRankCodexFindsWeeklyWindowByLength(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	observed := now.Add(-time.Minute)
++	codex := func(signals map[string]string) *Auth { return codexSubscription("codex-a", observed, signals) }
++	checkSoonestResetRanks(t, now, []soonestResetRankCase{
++		{
++			name: "pro plan carries the weekly window in primary",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":   "51",
++				"X-Codex-Primary-Window-Minutes": "10080",
++				"X-Codex-Primary-Reset-At":       epochSignal(now.Add(72 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(72 * time.Hour),
++		},
++		{
++			name: "zero filled secondary placeholder does not hide the weekly primary",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":          "20",
++				"X-Codex-Primary-Window-Minutes":        "10080",
++				"X-Codex-Primary-Reset-At":              epochSignal(now.Add(24 * time.Hour)),
++				"X-Codex-Secondary-Used-Percent":        "0",
++				"X-Codex-Secondary-Window-Minutes":      "0",
++				"X-Codex-Secondary-Reset-After-Seconds": "0",
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++		},
++		{
++			name: "zero filled secondary placeholder beside a short primary is no weekly window",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":          "10",
++				"X-Codex-Primary-Window-Minutes":        "300",
++				"X-Codex-Primary-Reset-At":              epochSignal(now.Add(time.Hour)),
++				"X-Codex-Secondary-Used-Percent":        "0",
++				"X-Codex-Secondary-Window-Minutes":      "0",
++				"X-Codex-Secondary-Reset-After-Seconds": "0",
++			}),
++			wantClass: soonestResetClassSubscription,
++		},
++		{
++			name: "weekly primary beats a secondary without a length",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Window-Minutes": "10080",
++				"X-Codex-Primary-Reset-At":       epochSignal(now.Add(24 * time.Hour)),
++				"X-Codex-Secondary-Used-Percent": "5",
++				"X-Codex-Secondary-Reset-At":     epochSignal(now.Add(2 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++		},
++		{
++			name: "weekly window in secondary, relative reset",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":          "10",
++				"X-Codex-Primary-Window-Minutes":        "300",
++				"X-Codex-Primary-Reset-At":              epochSignal(now.Add(time.Hour)),
++				"X-Codex-Secondary-Used-Percent":        "20",
++				"X-Codex-Secondary-Window-Minutes":      "10080",
++				"X-Codex-Secondary-Reset-After-Seconds": "7200",
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: observed.Add(2 * time.Hour),
++		},
++		{
++			name: "additional limit namespaces are ignored",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":               "10",
++				"X-Codex-Primary-Window-Minutes":             "300",
++				"X-Codex-Primary-Reset-At":                   epochSignal(now.Add(time.Hour)),
++				"X-Codex-Bengalfox-Secondary-Window-Minutes": "10080",
++				"X-Codex-Bengalfox-Secondary-Reset-At":       epochSignal(now.Add(24 * time.Hour)),
++			}),
++			wantClass: soonestResetClassSubscription,
++		},
++		{
++			name: "without lengths secondary is weekly",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Reset-At":   epochSignal(now.Add(time.Hour)),
++				"X-Codex-Secondary-Reset-At": epochSignal(now.Add(96 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(96 * time.Hour),
++		},
++		{
++			name: "lone secondary without a length is weekly",
++			auth: codex(map[string]string{
++				"X-Codex-Secondary-Reset-At": epochSignal(now.Add(30 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(30 * time.Hour),
++		},
++		{
++			name: "lone primary without a length is the short window",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent": "15",
++				"X-Codex-Primary-Reset-At":     epochSignal(now.Add(30 * time.Hour)),
++			}),
++			wantClass: soonestResetClassSubscription,
++		},
++		{
++			name: "two short windows have no weekly window",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Window-Minutes":   "60",
++				"X-Codex-Primary-Reset-At":         epochSignal(now.Add(30 * time.Minute)),
++				"X-Codex-Secondary-Window-Minutes": "300",
++				"X-Codex-Secondary-Reset-At":       epochSignal(now.Add(4 * time.Hour)),
++			}),
++			wantClass: soonestResetClassSubscription,
++		},
++		{
++			name: "used up short window is exhausted",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":     "100",
++				"X-Codex-Primary-Window-Minutes":   "300",
++				"X-Codex-Primary-Reset-At":         epochSignal(now.Add(time.Hour)),
++				"X-Codex-Secondary-Used-Percent":   "60",
++				"X-Codex-Secondary-Window-Minutes": "10080",
++				"X-Codex-Secondary-Reset-At":       epochSignal(now.Add(24 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++			exhausted: true,
++		},
++		{
++			name: "used up window with a zero delay ends at the observation",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Used-Percent":        "100",
++				"X-Codex-Primary-Window-Minutes":      "300",
++				"X-Codex-Primary-Reset-After-Seconds": "0",
++				"X-Codex-Secondary-Window-Minutes":    "10080",
++				"X-Codex-Secondary-Reset-At":          epochSignal(now.Add(24 * time.Hour)),
++			}),
++			wantClass: soonestResetClassKnown,
++			wantReset: now.Add(24 * time.Hour),
++		},
++		{
++			name: "rolled over weekly window is probed again",
++			auth: codex(map[string]string{
++				"X-Codex-Primary-Window-Minutes": "10080",
++				"X-Codex-Primary-Reset-At":       epochSignal(now.Add(-time.Minute)),
++			}),
++			wantClass: soonestResetClassProbe,
++		},
++		{
++			name: "codex api key never probes",
++			auth: &Auth{
++				ID:         "codex-key",
++				Provider:   "codex",
++				Attributes: map[string]string{AttributeAPIKey: "sk-test"},
++			},
++			wantClass: soonestResetClassOther,
++		},
++	})
++}
++
++func TestSoonestResetRankDevinUsesPolledWeeklyReset(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	reset := now.Add(36 * time.Hour)
++	auth := &Auth{
++		ID:       "devin-a",
++		Provider: "devin",
++		Quota: QuotaState{ObservedAt: now.Add(-time.Minute), Signals: map[string]string{
++			"weekly_quota_remaining_percent": "40%",
++			"weekly_quota_reset_at":          reset.Format(time.RFC3339),
++			"daily_quota_remaining_percent":  "0%",
++			"daily_quota_reset_at":           now.Add(3 * time.Hour).Format(time.RFC3339),
++		}},
++	}
++	rank := soonestResetFactsFor(auth).rank(now, false)
++	if rank.class != soonestResetClassKnown || !rank.weeklyReset.Equal(reset) {
++		t.Fatalf("rank = %+v, want known reset %v", rank, reset)
++	}
++	if !rank.exhausted {
++		t.Fatal("exhausted = false, want true while the daily quota is used up")
++	}
++	if rank := soonestResetFactsFor(&Auth{ID: "devin-b", Provider: "devin"}).rank(now, false); rank.class != soonestResetClassOther {
++		t.Fatalf("unobserved devin class = %d, want other (its quota is polled, not probed)", rank.class)
++	}
++}
++
++func TestParseQuotaResetTime(t *testing.T) {
++	t.Parallel()
++
++	for raw, want := range map[string]time.Time{
++		"1787695200":           time.Unix(1787695200, 0),
++		"1787695200.5":         time.Unix(1787695200, int64(500*time.Millisecond)),
++		"2026-10-26T12:00:00Z": time.Date(2026, time.October, 26, 12, 0, 0, 0, time.UTC),
++	} {
++		got, ok := parseQuotaResetTime(raw)
++		if !ok || !got.Equal(want) {
++			t.Fatalf("parseQuotaResetTime(%q) = %v, %v; want %v", raw, got, ok, want)
++		}
++	}
++	for _, raw := range []string{"", "soon", "NaN", "-5", "0", "1e300"} {
++		if got, ok := parseQuotaResetTime(raw); ok {
++			t.Fatalf("parseQuotaResetTime(%q) = %v, want rejection", raw, got)
++		}
++	}
++}
++
++func TestPickSoonestResetAuthOrdering(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	observed := now.Add(-time.Minute)
++	known3d := claudeSubscription("known-3d", observed, claudeWeeklySignals(now, now.Add(72*time.Hour)))
++	known1d := claudeSubscription("known-1d", observed, claudeWeeklySignals(now, now.Add(24*time.Hour)))
++	exhausted := claudeSubscription("exhausted", observed, map[string]string{
++		"Anthropic-Ratelimit-Unified-7d-Status": "rejected",
++		"Anthropic-Ratelimit-Unified-7d-Reset":  epochSignal(now.Add(time.Hour)),
++	})
++	probe := claudeSubscription("probe", time.Time{}, nil)
++	noWeekly := claudeSubscription("no-weekly", observed, map[string]string{
++		"Anthropic-Ratelimit-Unified-5h-Reset": epochSignal(now.Add(time.Hour)),
++	})
++	apiKey := &Auth{ID: "a-api-key", Provider: "claude", Attributes: map[string]string{AttributeAPIKey: "sk-ant-api03"}}
++
++	steps := []struct {
++		auths []*Auth
++		want  string
++	}{
++		{auths: []*Auth{apiKey, noWeekly, exhausted, known3d, known1d, probe}, want: "probe"},
++		{auths: []*Auth{apiKey, noWeekly, exhausted, known3d, known1d}, want: "known-1d"},
++		{auths: []*Auth{apiKey, noWeekly, exhausted, known3d}, want: "known-3d"},
++		{auths: []*Auth{apiKey, noWeekly, exhausted}, want: "no-weekly"},
++		{auths: []*Auth{apiKey, exhausted}, want: "a-api-key"},
++		{auths: []*Auth{exhausted}, want: "exhausted"},
++	}
++	for index, step := range steps {
++		if got := pickSoonestResetAuth(step.auths, now, nil, nil, true); got == nil || got.ID != step.want {
++			t.Fatalf("step %d picked %v, want %s", index, got, step.want)
++		}
++	}
++
++	twinB := claudeSubscription("twin-b", observed, claudeWeeklySignals(now, now.Add(24*time.Hour)))
++	twinA := claudeSubscription("twin-a", observed, claudeWeeklySignals(now, now.Add(24*time.Hour)))
++	if got := pickSoonestResetAuth([]*Auth{twinB, twinA}, now, nil, nil, true); got.ID != "twin-a" {
++		t.Fatalf("tie picked %s, want lowest ID twin-a", got.ID)
++	}
++}
++
++func TestPickSoonestResetAuthProbesEachUnknownOnce(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	unknownA := claudeSubscription("unknown-a", time.Time{}, nil)
++	unknownB := claudeSubscription("unknown-b", time.Time{}, nil)
++	known := claudeSubscription("known", now.Add(-time.Minute), claudeWeeklySignals(now, now.Add(96*time.Hour)))
++	auths := []*Auth{known, unknownB, unknownA}
++	var probes soonestResetProbes
++
++	want := []string{"unknown-a", "unknown-b", "known", "known"}
++	for index, wantID := range want {
++		if got := pickSoonestResetAuth(auths, now.Add(time.Duration(index)*time.Second), nil, &probes, true); got.ID != wantID {
++			t.Fatalf("pick %d = %s, want %s", index, got.ID, wantID)
++		}
++	}
++	// Without a known reset, pending probes rank as subscriptions ahead of other credentials.
++	apiKey := &Auth{ID: "a-api-key", Provider: "claude", Attributes: map[string]string{AttributeAPIKey: "sk-ant-api03"}}
++	if got := pickSoonestResetAuth([]*Auth{apiKey, unknownB, unknownA}, now.Add(time.Minute), nil, &probes, true); got.ID != "unknown-a" {
++		t.Fatalf("pick with pending probes = %s, want subscription unknown-a", got.ID)
++	}
++	// An answer that never arrives frees the credential for another probe after the hold.
++	later := now.Add(soonestResetProbeHold + time.Second)
++	if got := pickSoonestResetAuth(auths, later, nil, &probes, true); got.ID != "unknown-a" {
++		t.Fatalf("pick after hold = %s, want probe unknown-a", got.ID)
++	}
++	if len(probes) != 1 {
++		t.Fatalf("probes = %v, want only the fresh probe after expired entries are pruned", probes)
++	}
++}
++
++func TestPickSoonestResetAuthWithoutRecordingKeepsProbeAvailable(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	unknownA := claudeSubscription("unknown-a", time.Time{}, nil)
++	unknownB := claudeSubscription("unknown-b", time.Time{}, nil)
++	auths := []*Auth{unknownB, unknownA}
++	var probes soonestResetProbes
++	for index := 0; index < 2; index++ {
++		if got := pickSoonestResetAuth(auths, now, nil, &probes, false); got.ID != "unknown-a" {
++			t.Fatalf("unrecorded pick %d = %s, want unknown-a", index, got.ID)
++		}
++	}
++	if len(probes) != 0 {
++		t.Fatalf("probes = %v, want none recorded", probes)
++	}
++	pickSoonestResetAuth(auths, now, nil, &probes, true)
++	if got := pickSoonestResetAuth(auths, now, nil, &probes, false); got.ID != "unknown-b" {
++		t.Fatalf("unrecorded pick after a probe = %s, want unknown-b (pending probes are respected)", got.ID)
++	}
++}
++
++func TestSoonestResetSelectorPickReservesProbes(t *testing.T) {
++	t.Parallel()
++
++	newSelectors := map[string]func() Selector{
++		"bare": func() Selector { return &SoonestResetSelector{} },
++		"session affinity fallback": func() Selector {
++			return NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &SoonestResetSelector{}, TTL: time.Hour})
++		},
++	}
++	for name, newSelector := range newSelectors {
++		t.Run(name, func(t *testing.T) {
++			t.Parallel()
++			selector := newSelector()
++			if stoppable, ok := selector.(StoppableSelector); ok {
++				t.Cleanup(stoppable.Stop)
++			}
++			auths := []*Auth{claudeSubscription("unknown-b", time.Time{}, nil), claudeSubscription("unknown-a", time.Time{}, nil)}
++			pick := func(ctx context.Context) string {
++				t.Helper()
++				got, errPick := selector.Pick(ctx, "claude", "", cliproxyexecutor.Options{}, auths)
++				if errPick != nil {
++					t.Fatalf("Pick() error = %v", errPick)
++				}
++				return got.ID
++			}
++			if got := pick(withoutSoonestResetProbe(context.Background())); got != "unknown-a" {
++				t.Fatalf("suppressed pick = %s, want unknown-a", got)
++			}
++			if got := pick(context.Background()); got != "unknown-a" {
++				t.Fatalf("first probe = %s, want unknown-a (suppressed picks do not reserve)", got)
++			}
++			if got := pick(context.Background()); got != "unknown-b" {
++				t.Fatalf("second pick = %s, want unknown-b while unknown-a's probe is pending", got)
++			}
++		})
++	}
++}
++
++func TestSoonestResetSelectorPickRespectsPriorityTiers(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	observed := now.Add(-time.Minute)
++	low := claudeSubscription("low-priority-soonest", observed, claudeWeeklySignals(now, now.Add(time.Hour)))
++	high := claudeSubscription("high-priority-later", observed, claudeWeeklySignals(now, now.Add(96*time.Hour)))
++	high.Attributes = map[string]string{"priority": "10"}
++
++	got, errPick := (&SoonestResetSelector{}).Pick(context.Background(), "claude", "", cliproxyexecutor.Options{}, []*Auth{low, high})
++	if errPick != nil {
++		t.Fatalf("Pick() error = %v", errPick)
++	}
++	if got.ID != high.ID {
++		t.Fatalf("Pick() = %s, want the higher priority tier %s", got.ID, high.ID)
++	}
++}
++
++func registerSoonestResetModels(t *testing.T, provider string, authIDs []string, models ...string) {
++	t.Helper()
++	reg := registry.GetGlobalRegistry()
++	infos := make([]*registry.ModelInfo, 0, len(models))
++	for _, model := range models {
++		infos = append(infos, &registry.ModelInfo{ID: model})
++	}
++	for _, id := range authIDs {
++		reg.RegisterClient(id, provider, infos)
++		t.Cleanup(func() { reg.UnregisterClient(id) })
++	}
++}
++
++func TestSchedulerPick_SoonestResetUsesFreshQuotaAcrossModelShards(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	observed := now.Add(-time.Minute)
++	registerSoonestResetModels(t, "claude", []string{"sr-shard-a", "sr-shard-b"}, "sr-shard-model-x", "sr-shard-model-y")
++
++	authA := claudeSubscription("sr-shard-a", observed, claudeWeeklySignals(now, now.Add(72*time.Hour)))
++	authB := claudeSubscription("sr-shard-b", time.Time{}, nil)
++	scheduler := newSchedulerForTest(&SoonestResetSelector{}, authA, authB)
++
++	pick := func(model string) string {
++		t.Helper()
++		got, errPick := scheduler.pickSingle(context.Background(), "claude", model, cliproxyexecutor.Options{}, nil)
++		if errPick != nil {
++			t.Fatalf("pickSingle(%s) error = %v", model, errPick)
++		}
++		return got.ID
++	}
++	// b is an unobserved subscription, so it is probed once; the next pick, on another
++	// model, sees the pending probe and falls back to a's known reset.
++	if got := pick("sr-shard-model-x"); got != "sr-shard-b" {
++		t.Fatalf("model x picked %s, want probe sr-shard-b", got)
++	}
++	if got := pick("sr-shard-model-y"); got != "sr-shard-a" {
++		t.Fatalf("model y picked %s, want sr-shard-a while b's probe is pending", got)
++	}
++
++	// A result on model x teaches b's reset; then a's reset moves sooner. Targeted updates
++	// refresh only model x's shard, so model y must rank with the provider-level snapshots.
++	scheduler.upsertAuthResult(claudeSubscription("sr-shard-b", now, claudeWeeklySignals(now, now.Add(24*time.Hour))), []string{"sr-shard-model-x"}, false)
++	if got := pick("sr-shard-model-y"); got != "sr-shard-b" {
++		t.Fatalf("model y picked %s, want soonest reset sr-shard-b from fresh provider metadata", got)
++	}
++	authA.Quota.Signals = claudeWeeklySignals(now, now.Add(12*time.Hour))
++	scheduler.upsertAuthResult(authA, []string{"sr-shard-model-x"}, false)
++	if got := pick("sr-shard-model-y"); got != "sr-shard-a" {
++		t.Fatalf("model y picked %s, want soonest reset sr-shard-a from fresh provider metadata", got)
++	}
++
++	tried := map[string]struct{}{"sr-shard-a": {}}
++	got, errPick := scheduler.pickSingle(context.Background(), "claude", "sr-shard-model-y", cliproxyexecutor.Options{}, tried)
++	if errPick != nil || got.ID != "sr-shard-b" {
++		t.Fatalf("retry pick = %v, %v; want sr-shard-b", got, errPick)
++	}
++}
++
++func TestSchedulerPick_SoonestResetRanksAcrossMixedProviders(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	observed := now.Add(-time.Minute)
++	claudeLater := claudeSubscription("claude-later", observed, claudeWeeklySignals(now, now.Add(96*time.Hour)))
++	codexSooner := codexSubscription("codex-sooner", observed, map[string]string{
++		"X-Codex-Primary-Window-Minutes": "10080",
++		"X-Codex-Primary-Reset-At":       epochSignal(now.Add(24 * time.Hour)),
++	})
++	geminiKey := &Auth{ID: "a-gemini-key", Provider: "gemini", Attributes: map[string]string{AttributeAPIKey: "key"}}
++	scheduler := newSchedulerForTest(&SoonestResetSelector{}, claudeLater, codexSooner, geminiKey)
++
++	providers := []string{"gemini", "claude", "codex"}
++	for index := 0; index < 3; index++ {
++		got, provider, errPick := scheduler.pickMixed(context.Background(), providers, "", cliproxyexecutor.Options{}, nil)
++		if errPick != nil {
++			t.Fatalf("pickMixed() #%d error = %v", index, errPick)
++		}
++		if got.ID != "codex-sooner" || provider != "codex" {
++			t.Fatalf("pickMixed() #%d = %s/%s, want codex-sooner/codex", index, got.ID, provider)
++		}
++	}
++	got, provider, errPick := scheduler.pickMixed(context.Background(), providers, "", cliproxyexecutor.Options{}, map[string]struct{}{"codex-sooner": {}})
++	if errPick != nil || got.ID != "claude-later" || provider != "claude" {
++		t.Fatalf("pickMixed(tried codex) = %v/%s, %v; want claude-later/claude", got, provider, errPick)
++	}
++}
++
++func TestSchedulerPickMixed_SoonestResetReservesProbes(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	claudeUnknown := claudeSubscription("claude-unknown", time.Time{}, nil)
++	codexKnown := codexSubscription("codex-known", now.Add(-time.Minute), map[string]string{
++		"X-Codex-Primary-Window-Minutes": "10080",
++		"X-Codex-Primary-Reset-At":       epochSignal(now.Add(48 * time.Hour)),
++	})
++	scheduler := newSchedulerForTest(&SoonestResetSelector{}, claudeUnknown, codexKnown)
++	providers := []string{"codex", "claude"}
++	pick := func(ctx context.Context) string {
++		t.Helper()
++		got, _, errPick := scheduler.pickMixed(ctx, providers, "", cliproxyexecutor.Options{}, nil)
++		if errPick != nil {
++			t.Fatalf("pickMixed() error = %v", errPick)
++		}
++		return got.ID
++	}
++	if got := pick(withoutSoonestResetProbe(context.Background())); got != "claude-unknown" {
++		t.Fatalf("suppressed pick = %s, want claude-unknown", got)
++	}
++	if got := pick(context.Background()); got != "claude-unknown" {
++		t.Fatalf("probe pick = %s, want claude-unknown (suppressed picks do not reserve)", got)
++	}
++	if got := pick(context.Background()); got != "codex-known" {
++		t.Fatalf("pick while probe pending = %s, want codex-known", got)
++	}
++}
++
++func TestSchedulerPickMixed_SoonestResetTiesResolveToLowestIDAcrossProviders(t *testing.T) {
++	t.Parallel()
++
++	claudeKey := &Auth{ID: "b-claude-key", Provider: "claude", Attributes: map[string]string{AttributeAPIKey: "sk-ant-api03"}}
++	geminiKey := &Auth{ID: "a-gemini-key", Provider: "gemini", Attributes: map[string]string{AttributeAPIKey: "key"}}
++	scheduler := newSchedulerForTest(&SoonestResetSelector{}, claudeKey, geminiKey)
++
++	got, provider, errPick := scheduler.pickMixed(context.Background(), []string{"claude", "gemini"}, "", cliproxyexecutor.Options{}, nil)
++	if errPick != nil || got.ID != "a-gemini-key" || provider != "gemini" {
++		t.Fatalf("pickMixed() = %v/%s, %v; want lowest ID a-gemini-key/gemini like the legacy selector", got, provider, errPick)
++	}
++}
++
++func TestSchedulerPickMixed_SoonestResetUsesFreshQuotaAcrossModelShards(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	observed := now.Add(-time.Minute)
++	registerSoonestResetModels(t, "claude", []string{"sr-mixed-claude"}, "sr-mixed-model-x", "sr-mixed-model-y")
++	registerSoonestResetModels(t, "codex", []string{"sr-mixed-codex"}, "sr-mixed-model-x", "sr-mixed-model-y")
++
++	claudeAuth := claudeSubscription("sr-mixed-claude", observed, claudeWeeklySignals(now, now.Add(48*time.Hour)))
++	codexAuth := codexSubscription("sr-mixed-codex", observed, map[string]string{
++		"X-Codex-Primary-Window-Minutes": "10080",
++		"X-Codex-Primary-Reset-At":       epochSignal(now.Add(24 * time.Hour)),
++	})
++	scheduler := newSchedulerForTest(&SoonestResetSelector{}, claudeAuth, codexAuth)
++	providers := []string{"claude", "codex"}
++	for _, model := range []string{"sr-mixed-model-x", "sr-mixed-model-y"} {
++		got, _, errPick := scheduler.pickMixed(context.Background(), providers, model, cliproxyexecutor.Options{}, nil)
++		if errPick != nil || got.ID != "sr-mixed-codex" {
++			t.Fatalf("pickMixed(%s) = %v, %v; want sr-mixed-codex", model, got, errPick)
++		}
++	}
++
++	// A result on model x moves Claude's weekly reset ahead of Codex's.
++	claudeAuth.Quota.Signals = claudeWeeklySignals(now, now.Add(6*time.Hour))
++	scheduler.upsertAuthResult(claudeAuth, []string{"sr-mixed-model-x"}, false)
++	got, provider, errPick := scheduler.pickMixed(context.Background(), providers, "sr-mixed-model-y", cliproxyexecutor.Options{}, nil)
++	if errPick != nil || got.ID != "sr-mixed-claude" || provider != "claude" {
++		t.Fatalf("pickMixed(model y) = %v/%s, %v; want sr-mixed-claude from fresh provider metadata", got, provider, errPick)
++	}
++}
++
++func TestManager_InitializesSchedulerForSoonestResetSelector(t *testing.T) {
++	t.Parallel()
++
++	manager := NewManager(nil, &SoonestResetSelector{}, nil)
++	if manager.scheduler.strategy != schedulerStrategySoonestReset {
++		t.Fatalf("scheduler strategy = %v, want %v", manager.scheduler.strategy, schedulerStrategySoonestReset)
++	}
++	if !manager.useSchedulerFastPath() {
++		t.Fatal("soonest-reset must use the scheduler fast path as a built-in selector")
++	}
++	manager.SetSelector(&FillFirstSelector{})
++	manager.SetSelector(&SoonestResetSelector{})
++	if manager.scheduler.strategy != schedulerStrategySoonestReset {
++		t.Fatalf("scheduler strategy after switch = %v, want %v", manager.scheduler.strategy, schedulerStrategySoonestReset)
++	}
++}
++
++// soonestResetQuotaExecutor answers every request with Claude unified quota headers whose
++// weekly reset depends on the credential, like the upstream does.
++type soonestResetQuotaExecutor struct {
++	mu     sync.Mutex
++	resets map[string]time.Time
++	picked []string
++}
++
++func (*soonestResetQuotaExecutor) Identifier() string { return "claude" }
++
++func (e *soonestResetQuotaExecutor) Execute(ctx context.Context, auth *Auth, _ cliproxyexecutor.Request, _ cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
++	e.mu.Lock()
++	e.picked = append(e.picked, auth.ID)
++	reset := e.resets[auth.ID]
++	e.mu.Unlock()
++	internallogging.SetResponseHeaders(ctx, http.Header{
++		"Anthropic-Ratelimit-Unified-Status":         []string{"allowed"},
++		"Anthropic-Ratelimit-Unified-7d-Status":      []string{"allowed"},
++		"Anthropic-Ratelimit-Unified-7d-Utilization": []string{"0.2"},
++		"Anthropic-Ratelimit-Unified-7d-Reset":       []string{epochSignal(reset)},
++	})
++	return cliproxyexecutor.Response{Payload: []byte(`{}`)}, nil
++}
++
++func (*soonestResetQuotaExecutor) ExecuteStream(context.Context, *Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
++	return nil, &Error{HTTPStatus: http.StatusNotImplemented, Message: "not implemented"}
++}
++
++func (*soonestResetQuotaExecutor) Refresh(_ context.Context, auth *Auth) (*Auth, error) {
++	return auth, nil
++}
++
++func (e *soonestResetQuotaExecutor) CountTokens(ctx context.Context, auth *Auth, _ cliproxyexecutor.Request, _ cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
++	e.mu.Lock()
++	e.picked = append(e.picked, "count:"+auth.ID)
++	reset := e.resets[auth.ID]
++	e.mu.Unlock()
++	internallogging.SetResponseHeaders(ctx, http.Header{
++		"Anthropic-Ratelimit-Unified-7d-Reset": []string{epochSignal(reset)},
++	})
++	return cliproxyexecutor.Response{Payload: []byte(`{"input_tokens":1}`)}, nil
++}
++
++func (*soonestResetQuotaExecutor) HttpRequest(context.Context, *Auth, *http.Request) (*http.Response, error) {
++	return nil, &Error{HTTPStatus: http.StatusNotImplemented, Message: "not implemented"}
++}
++
++func (e *soonestResetQuotaExecutor) pickedIDs() []string {
++	e.mu.Lock()
++	defer e.mu.Unlock()
++	return append([]string(nil), e.picked...)
++}
++
++func TestManagerSoonestResetLearnsResetsThenSpendsSoonest(t *testing.T) {
++	selectors := map[string]func() Selector{
++		"scheduler fast path": func() Selector { return &SoonestResetSelector{} },
++		"session affinity fallback": func() Selector {
++			return NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &SoonestResetSelector{}, TTL: time.Hour})
++		},
++	}
++	for name, newSelector := range selectors {
++		t.Run(name, func(t *testing.T) {
++			selector := newSelector()
++			if stoppable, ok := selector.(StoppableSelector); ok {
++				t.Cleanup(stoppable.Stop)
++			}
++			now := time.Now()
++			prefix := "sr-manager-" + strconv.Itoa(len(name)) + "-"
++			executor := &soonestResetQuotaExecutor{resets: map[string]time.Time{
++				prefix + "a": now.Add(5 * 24 * time.Hour),
++				prefix + "b": now.Add(3 * 24 * time.Hour),
++				prefix + "c": now.Add(24 * time.Hour),
++			}}
++			manager := NewManager(nil, selector, nil)
++			manager.RegisterExecutor(executor)
++			modelX := prefix + "model-x"
++			modelY := prefix + "model-y"
++			ids := []string{prefix + "a", prefix + "b", prefix + "c"}
++			for _, id := range ids {
++				if _, errRegister := manager.Register(context.Background(), &Auth{
++					ID:       id,
++					Provider: "claude",
++					Status:   StatusActive,
++					Metadata: map[string]any{"access_token": "token-" + id},
++				}); errRegister != nil {
++					t.Fatalf("Register(%s) error = %v", id, errRegister)
++				}
++			}
++			registerSoonestResetModels(t, "claude", ids, modelX, modelY)
++
++			execute := func(model string) {
++				t.Helper()
++				if _, errExecute := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{Model: model}, cliproxyexecutor.Options{}); errExecute != nil {
++					t.Fatalf("Execute(%s) error = %v", model, errExecute)
++				}
++			}
++			// Model y probes a first, which also builds y's shard before b and c are observed.
++			execute(modelY)
++			for index := 0; index < 4; index++ {
++				execute(modelX)
++			}
++			execute(modelY)
++
++			want := []string{prefix + "a", prefix + "b", prefix + "c", prefix + "c", prefix + "c", prefix + "c"}
++			got := executor.pickedIDs()
++			if len(got) != len(want) {
++				t.Fatalf("picked = %v, want %v", got, want)
++			}
++			for index := range want {
++				if got[index] != want[index] {
++					t.Fatalf("picked = %v, want %v", got, want)
++				}
++			}
++		})
++	}
++}
++
++func TestManagerSoonestResetTokenCountsAndSelectAuthDoNotSpendProbes(t *testing.T) {
++	now := time.Now()
++	prefix := "sr-count-"
++	executor := &soonestResetQuotaExecutor{resets: map[string]time.Time{
++		prefix + "a": now.Add(24 * time.Hour),
++		prefix + "b": now.Add(5 * 24 * time.Hour),
++	}}
++	manager := NewManager(nil, &SoonestResetSelector{}, nil)
++	manager.RegisterExecutor(executor)
++	model := prefix + "model"
++	ids := []string{prefix + "a", prefix + "b"}
++	for _, id := range ids {
++		if _, errRegister := manager.Register(context.Background(), &Auth{
++			ID:       id,
++			Provider: "claude",
++			Status:   StatusActive,
++			Metadata: map[string]any{"access_token": "token-" + id},
++		}); errRegister != nil {
++			t.Fatalf("Register(%s) error = %v", id, errRegister)
++		}
++	}
++	registerSoonestResetModels(t, "claude", ids, model)
++
++	for index := 0; index < 2; index++ {
++		selected, errSelect := manager.SelectAuth(context.Background(), "claude", model, cliproxyexecutor.Options{})
++		if errSelect != nil || selected.ID != prefix+"a" {
++			t.Fatalf("SelectAuth() #%d = %v, %v; want %sa", index, selected, errSelect, prefix)
++		}
++	}
++	if _, errCount := manager.ExecuteCount(context.Background(), []string{"claude"}, cliproxyexecutor.Request{Model: model}, cliproxyexecutor.Options{}); errCount != nil {
++		t.Fatalf("ExecuteCount() error = %v", errCount)
++	}
++	for index := 0; index < 3; index++ {
++		if _, errExecute := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{Model: model}, cliproxyexecutor.Options{}); errExecute != nil {
++			t.Fatalf("Execute() #%d error = %v", index, errExecute)
++		}
++	}
++	// The count neither learns a's reset nor reserves it, so generation probes a, then b,
++	// then settles on a, whose weekly window resets first.
++	want := []string{"count:" + prefix + "a", prefix + "a", prefix + "b", prefix + "a"}
++	got := executor.pickedIDs()
++	if len(got) != len(want) {
++		t.Fatalf("picked = %v, want %v", got, want)
++	}
++	for index := range want {
++		if got[index] != want[index] {
++			t.Fatalf("picked = %v, want %v", got, want)
++		}
++	}
++}
++
++// claudeFastModeRefusalSignals is the quota snapshot of Claude's request-scoped fast-mode
++// credit refusal: unified quota headers without any usage window.
++func claudeFastModeRefusalSignals(now time.Time) map[string]string {
++	return map[string]string{
++		"Anthropic-Ratelimit-Unified-Reset":                   epochSignal(now.Add(5 * 24 * time.Hour)),
++		"Anthropic-Ratelimit-Unified-Overage-Disabled-Reason": "org_level_disabled_until",
++	}
++}
++
++func TestSoonestResetFactsCarryKeepsWindowsAcrossWindowlessSnapshots(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	reset := now.Add(24 * time.Hour)
++	known := soonestResetFactsFor(claudeSubscription("a", now.Add(-time.Minute), claudeWeeklySignals(now, reset)))
++	windowless := soonestResetFactsFor(claudeSubscription("a", now, claudeFastModeRefusalSignals(now)))
++	unobserved := soonestResetFactsFor(claudeSubscription("a", time.Time{}, nil))
++	if rank := windowless.rank(now, true); rank.class != soonestResetClassSubscription {
++		t.Fatalf("pending windowless class = %d, want subscription without carried facts", rank.class)
++	}
++	for name, facts := range map[string]soonestResetFacts{"windowless": windowless, "unobserved": unobserved} {
++		rank := facts.carry(known).rank(now, true)
++		if rank.class != soonestResetClassKnown || !rank.weeklyReset.Equal(reset) {
++			t.Fatalf("%s carried rank = %+v, want known reset %v", name, rank, reset)
++		}
++	}
++	// A snapshot that reports windows replaces the previous facts, even when it is worse.
++	exhausted := soonestResetFactsFor(claudeSubscription("a", now, map[string]string{
++		"Anthropic-Ratelimit-Unified-7d-Status": "rejected",
++		"Anthropic-Ratelimit-Unified-7d-Reset":  epochSignal(now.Add(time.Hour)),
++	}))
++	if rank := exhausted.carry(known).rank(now, false); !rank.exhausted {
++		t.Fatalf("windowed snapshot rank = %+v, want it to replace the carried facts", rank)
++	}
++	// With nothing to carry, a windowless snapshot still asks for a probe.
++	if rank := windowless.carry(soonestResetFacts{}).rank(now, false); rank.class != soonestResetClassProbe {
++		t.Fatalf("windowless without history class = %d, want probe", rank.class)
++	}
++	// Facts never carry between a subscription and a credential with nothing to learn.
++	apiKey := soonestResetFactsFor(&Auth{ID: "a", Provider: "claude", Attributes: map[string]string{AttributeAPIKey: "sk-ant-api03"}})
++	if rank := apiKey.carry(known).rank(now, false); rank.class != soonestResetClassOther {
++		t.Fatalf("api key carried class = %d, want other", rank.class)
++	}
++}
++
++// TestSoonestResetWindowlessSnapshotKeepsKnownReset follows Claude Code's fast-mode fallback:
++// a fast request is refused with a windowless snapshot while the credential's probe is still
++// pending, and the standard retry must stay on the soonest reset.
++func TestSoonestResetWindowlessSnapshotKeepsKnownReset(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	setup := func(prefix string) (soonest, later, learned, refused *Auth) {
++		soonest = claudeSubscription(prefix+"a", time.Time{}, nil)
++		later = claudeSubscription(prefix+"b", now.Add(-time.Minute), claudeWeeklySignals(now, now.Add(72*time.Hour)))
++		learned = claudeSubscription(soonest.ID, now, claudeWeeklySignals(now, now.Add(24*time.Hour)))
++		learned.Generation = 1
++		refused = claudeSubscription(soonest.ID, now, claudeFastModeRefusalSignals(now))
++		refused.Generation = 2
++		return soonest, later, learned, refused
++	}
++
++	t.Run("selector", func(t *testing.T) {
++		t.Parallel()
++		soonest, later, learned, refused := setup("sr-windowless-selector-")
++		selector := &SoonestResetSelector{}
++		pick := func(ctx context.Context, auths ...*Auth) string {
++			t.Helper()
++			got, errPick := selector.Pick(ctx, "claude", "", cliproxyexecutor.Options{}, auths)
++			if errPick != nil {
++				t.Fatalf("Pick() error = %v", errPick)
++			}
++			return got.ID
++		}
++		if got := pick(context.Background(), soonest, later); got != soonest.ID {
++			t.Fatalf("probe pick = %s, want %s", got, soonest.ID)
++		}
++		// The selector ranks from the facts it is handed, which the Manager's scheduler carried
++		// across the windowless snapshot.
++		recorded := withSoonestResetFacts(context.Background(), map[string]soonestResetFacts{
++			soonest.ID: soonestResetFactsFor(refused).carry(soonestResetFactsFor(learned)),
++		})
++		if got := pick(recorded, refused, later); got != soonest.ID {
++			t.Fatalf("pick with recorded facts = %s, want %s", got, soonest.ID)
++		}
++		// On its own snapshot the refused credential is an unknown subscription with a pending probe.
++		if got := pick(context.Background(), refused, later); got != later.ID {
++			t.Fatalf("pick without recorded facts = %s, want %s", got, later.ID)
++		}
++	})
++
++	t.Run("scheduler", func(t *testing.T) {
++		t.Parallel()
++		soonest, later, learned, refused := setup("sr-windowless-scheduler-")
++		scheduler := newSchedulerForTest(&SoonestResetSelector{}, soonest, later)
++		pick := func(step string) {
++			t.Helper()
++			got, errPick := scheduler.pickSingle(context.Background(), "claude", "", cliproxyexecutor.Options{}, nil)
++			if errPick != nil || got.ID != soonest.ID {
++				t.Fatalf("%s pick = %v, %v; want %s", step, got, errPick, soonest.ID)
++			}
++		}
++		pick("probe")
++		scheduler.upsertAuthResult(learned, nil, false)
++		pick("learned")
++		scheduler.upsertAuthResult(refused, nil, false)
++		pick("refused")
++
++		// A rebuild keeps the carried facts too.
++		scheduler.rebuild([]*Auth{refused, later})
++		scheduler.mu.Lock()
++		facts := scheduler.providers["claude"].auths[soonest.ID].soonestReset
++		scheduler.mu.Unlock()
++		if wantReset := now.Add(24 * time.Hour); facts.weeklyReset.Unix() != wantReset.Unix() {
++			t.Fatalf("weekly reset after rebuild = %v, want %v", facts.weeklyReset, wantReset)
++		}
++	})
++}
++
++// soonestResetFastModeExecutor refuses fast-mode requests like Claude does for accounts
++// without usage credits: a request-scoped 429 whose quota headers report no usage window.
++type soonestResetFastModeExecutor struct {
++	*soonestResetQuotaExecutor
++}
++
++func (e soonestResetFastModeExecutor) Execute(ctx context.Context, auth *Auth, req cliproxyexecutor.Request, opts cliproxyexecutor.Options) (cliproxyexecutor.Response, error) {
++	if string(req.Payload) != `{"speed":"fast"}` {
++		return e.soonestResetQuotaExecutor.Execute(ctx, auth, req, opts)
++	}
++	e.mu.Lock()
++	e.picked = append(e.picked, "fast:"+auth.ID)
++	e.mu.Unlock()
++	headers := http.Header{}
++	for key, value := range claudeFastModeRefusalSignals(time.Now()) {
++		headers.Set(key, value)
++	}
++	internallogging.SetResponseHeaders(ctx, headers)
++	return cliproxyexecutor.Response{}, NewRequestScopedError("Usage credits are required for fast mode.", http.StatusTooManyRequests)
++}
++
++func TestManagerSoonestResetFastModeRefusalKeepsSoonestReset(t *testing.T) {
++	selectors := map[string]func() Selector{
++		"scheduler fast path": func() Selector { return &SoonestResetSelector{} },
++		"session affinity fallback": func() Selector {
++			return NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &SoonestResetSelector{}, TTL: time.Hour})
++		},
++	}
++	for name, newSelector := range selectors {
++		t.Run(name, func(t *testing.T) {
++			selector := newSelector()
++			if stoppable, ok := selector.(StoppableSelector); ok {
++				t.Cleanup(stoppable.Stop)
++			}
++			now := time.Now()
++			prefix := "sr-fast-" + strconv.Itoa(len(name)) + "-"
++			executor := &soonestResetQuotaExecutor{resets: map[string]time.Time{
++				prefix + "a": now.Add(24 * time.Hour),
++				prefix + "b": now.Add(3 * 24 * time.Hour),
++			}}
++			manager := NewManager(nil, selector, nil)
++			manager.RegisterExecutor(soonestResetFastModeExecutor{executor})
++			model := prefix + "model"
++			ids := []string{prefix + "a", prefix + "b"}
++			for _, id := range ids {
++				if _, errRegister := manager.Register(context.Background(), &Auth{
++					ID:       id,
++					Provider: "claude",
++					Status:   StatusActive,
++					Metadata: map[string]any{"access_token": "token-" + id},
++				}); errRegister != nil {
++					t.Fatalf("Register(%s) error = %v", id, errRegister)
++				}
++			}
++			registerSoonestResetModels(t, "claude", ids, model)
++
++			execute := func(payload string) error {
++				_, errExecute := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{Model: model, Payload: []byte(payload)}, cliproxyexecutor.Options{})
++				return errExecute
++			}
++			// Probe a, then b; a's probe is still pending when its fast requests are refused.
++			for index := 0; index < 2; index++ {
++				if errExecute := execute(`{}`); errExecute != nil {
++					t.Fatalf("probe %d error = %v", index, errExecute)
++				}
++			}
++			for index := 0; index < 2; index++ {
++				if errExecute := execute(`{"speed":"fast"}`); errExecute == nil {
++					t.Fatalf("fast request %d succeeded, want the refusal", index)
++				}
++				if errExecute := execute(`{}`); errExecute != nil {
++					t.Fatalf("standard retry %d error = %v", index, errExecute)
++				}
++			}
++
++			a, b := prefix+"a", prefix+"b"
++			want := []string{a, b, "fast:" + a, a, "fast:" + a, a}
++			got := executor.pickedIDs()
++			if len(got) != len(want) {
++				t.Fatalf("picked = %v, want %v", got, want)
++			}
++			for index := range want {
++				if got[index] != want[index] {
++					t.Fatalf("picked = %v, want %v", got, want)
++				}
++			}
++		})
++	}
++}
++
++func TestSoonestResetWindowlessRejectionKeepsCredentialUsedUp(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	reset := now.Add(24 * time.Hour)
++	known := soonestResetFactsFor(claudeSubscription("a", now.Add(-time.Minute), claudeWeeklySignals(now, reset)))
++	rejection := func(claim string, until time.Time) soonestResetFacts {
++		signals := map[string]string{
++			"Anthropic-Ratelimit-Unified-Status":               "rejected",
++			"Anthropic-Ratelimit-Unified-Representative-Claim": claim,
++		}
++		if !until.IsZero() {
++			signals["Anthropic-Ratelimit-Unified-Reset"] = epochSignal(until)
++		}
++		return soonestResetFactsFor(claudeSubscription("a", now, signals))
++	}
++
++	fiveHour := rejection("five_hour", now.Add(4*time.Hour))
++	if rank := fiveHour.rank(now, false); !rank.exhausted || rank.class != soonestResetClassProbe {
++		t.Fatalf("rejection without history rank = %+v, want an exhausted probe", rank)
++	}
++	carried := fiveHour.carry(known)
++	if rank := carried.rank(now, false); !rank.exhausted || rank.class != soonestResetClassKnown || !rank.weeklyReset.Equal(reset) {
++		t.Fatalf("carried rejection rank = %+v, want exhausted with known reset %v", rank, reset)
++	}
++	if rank := carried.rank(now.Add(5*time.Hour), false); rank.exhausted || rank.class != soonestResetClassKnown {
++		t.Fatalf("rank after the rejection ends = %+v, want usable with the known reset", rank)
++	}
++	if got := rejection("seven_day", time.Time{}).exhaustedUntil; !got.Equal(now.Add(quotaWindowWeek)) {
++		t.Fatalf("seven_day rejection without reset holds until %v, want %v", got, now.Add(quotaWindowWeek))
++	}
++	if rank := rejection("overage", now.Add(4*time.Hour)).carry(known).rank(now, false); rank.exhausted || rank.class != soonestResetClassKnown {
++		t.Fatalf("overage rejection rank = %+v, want the usable known facts", rank)
++	}
++
++	// Ranking from the carried facts moves on to the next soonest reset while the rejection
++	// holds, and back once it ends.
++	soonest := claudeSubscription("a-soonest", now.Add(-time.Minute), claudeWeeklySignals(now, reset))
++	later := claudeSubscription("b-later", now.Add(-time.Minute), claudeWeeklySignals(now, now.Add(72*time.Hour)))
++	rejected := claudeSubscription(soonest.ID, now, map[string]string{
++		"Anthropic-Ratelimit-Unified-Status":               "rejected",
++		"Anthropic-Ratelimit-Unified-Reset":                epochSignal(now.Add(4 * time.Hour)),
++		"Anthropic-Ratelimit-Unified-Representative-Claim": "five_hour",
++	})
++	recorded := map[string]soonestResetFacts{soonest.ID: soonestResetFactsFor(rejected).carry(soonestResetFactsFor(soonest))}
++	if got := pickSoonestResetAuth([]*Auth{rejected, later}, now, recorded, nil, true); got.ID != later.ID {
++		t.Fatalf("pick during the rejection = %s, want %s", got.ID, later.ID)
++	}
++	if got := pickSoonestResetAuth([]*Auth{rejected, later}, now.Add(5*time.Hour), recorded, nil, true); got.ID != soonest.ID {
++		t.Fatalf("pick after the rejection = %s, want %s with its carried reset", got.ID, soonest.ID)
++	}
++}
++
++// TestManagerSoonestResetSessionAffinityRanksFromRecordedResults covers session affinity,
++// where most requests reuse a binding without a pick: a credential's windows must still be
++// known when a later new session is picked while its snapshot is windowless again.
++func TestManagerSoonestResetSessionAffinityRanksFromRecordedResults(t *testing.T) {
++	affinity := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &SoonestResetSelector{}, TTL: time.Hour})
++	t.Cleanup(affinity.Stop)
++	now := time.Now()
++	prefix := "sr-affinity-"
++	a, b := prefix+"a", prefix+"b"
++	executor := &soonestResetQuotaExecutor{resets: map[string]time.Time{
++		a: now.Add(6 * 24 * time.Hour),
++		b: now.Add(24 * time.Hour),
++	}}
++	manager := NewManager(nil, affinity, nil)
++	manager.RegisterExecutor(soonestResetFastModeExecutor{executor})
++	model := prefix + "model"
++	for _, id := range []string{a, b} {
++		if _, errRegister := manager.Register(context.Background(), &Auth{
++			ID:       id,
++			Provider: "claude",
++			Status:   StatusActive,
++			Metadata: map[string]any{"access_token": "token-" + id},
++		}); errRegister != nil {
++			t.Fatalf("Register(%s) error = %v", id, errRegister)
++		}
++	}
++	registerSoonestResetModels(t, "claude", []string{a, b}, model)
++
++	execute := func(session, payload string) {
++		t.Helper()
++		opts := cliproxyexecutor.Options{Headers: http.Header{"X-Claude-Code-Session-Id": []string{session}}}
++		_, errExecute := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{Model: model, Payload: []byte(payload)}, opts)
++		if (errExecute != nil) != (payload != `{}`) {
++			t.Fatalf("Execute(%s, %s) error = %v", session, payload, errExecute)
++		}
++	}
++	execute("s1", `{"speed":"fast"}`) // probes a, which stays windowless
++	execute("s2", `{}`)               // probes b while a's probe is pending
++	execute("s1", `{}`)               // a learns its reset through the binding, without a pick
++	execute("s1", `{"speed":"fast"}`) // a is windowless again
++	// Once the probe hold passes, a new session must rank a by its recorded reset.
++	fallback := affinity.fallback.(*SoonestResetSelector)
++	fallback.mu.Lock()
++	for id := range fallback.probes {
++		fallback.probes[id] = now.Add(-2 * soonestResetProbeHold)
++	}
++	fallback.mu.Unlock()
++	execute("s3", `{}`)
++
++	want := []string{"fast:" + a, b, a, "fast:" + a, b}
++	got := executor.pickedIDs()
++	if len(got) != len(want) {
++		t.Fatalf("picked = %v, want %v", got, want)
++	}
++	for index := range want {
++		if got[index] != want[index] {
++			t.Fatalf("picked = %v, want %v", got, want)
++		}
++	}
++}
++
++// TestManagerSoonestResetSelectAuthRanksFromRecordedResults covers the legacy path with the
++// bare selector, which SelectAuth callers take: a credential whose snapshot turned windowless
++// must keep its recorded reset rather than jump ahead as a probe.
++func TestManagerSoonestResetSelectAuthRanksFromRecordedResults(t *testing.T) {
++	now := time.Now()
++	prefix := "sr-select-recorded-"
++	a, b := prefix+"a", prefix+"b"
++	executor := &soonestResetQuotaExecutor{resets: map[string]time.Time{
++		a: now.Add(3 * 24 * time.Hour),
++		b: now.Add(24 * time.Hour),
++	}}
++	manager := NewManager(nil, &SoonestResetSelector{}, nil)
++	manager.RegisterExecutor(soonestResetFastModeExecutor{executor})
++	model := prefix + "model"
++	for _, id := range []string{a, b} {
++		if _, errRegister := manager.Register(context.Background(), &Auth{
++			ID:       id,
++			Provider: "claude",
++			Status:   StatusActive,
++			Metadata: map[string]any{"access_token": "token-" + id},
++		}); errRegister != nil {
++			t.Fatalf("Register(%s) error = %v", id, errRegister)
++		}
++	}
++	registerSoonestResetModels(t, "claude", []string{a, b}, model)
++	execute := func(payload string, opts cliproxyexecutor.Options) {
++		t.Helper()
++		_, errExecute := manager.Execute(context.Background(), []string{"claude"}, cliproxyexecutor.Request{Model: model, Payload: []byte(payload)}, opts)
++		if (errExecute != nil) != (payload != `{}`) {
++			t.Fatalf("Execute(%s) error = %v", payload, errExecute)
++		}
++	}
++	execute(`{}`, cliproxyexecutor.Options{}) // probes a
++	execute(`{}`, cliproxyexecutor.Options{}) // probes b
++	execute(`{"speed":"fast"}`, cliproxyexecutor.Options{Metadata: map[string]any{cliproxyexecutor.PinnedAuthMetadataKey: a}})
++
++	selected, errSelect := manager.SelectAuth(context.Background(), "claude", model, cliproxyexecutor.Options{})
++	if errSelect != nil || selected.ID != b {
++		t.Fatalf("SelectAuth() = %v, %v; want the soonest recorded reset %s", selected, errSelect, b)
++	}
++	if want := []string{a, b, "fast:" + a}; len(executor.pickedIDs()) != len(want) {
++		t.Fatalf("picked = %v, want %v", executor.pickedIDs(), want)
++	}
++}
+diff --git a/sdk/cliproxy/service_config.go b/sdk/cliproxy/service_config.go
+index 890af119e08..a0c3e321048 100644
+--- a/sdk/cliproxy/service_config.go
++++ b/sdk/cliproxy/service_config.go
+@@ -78,6 +78,8 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
+ 		state.strategy = "weighted-round-robin"
+ 	case "fill-first", "fillfirst", "ff":
+ 		state.strategy = "fill-first"
++	case "soonest-reset", "soonestreset", "reset-first", "resetfirst":
++		state.strategy = "soonest-reset"
+ 	}
+ 	state.sessionAffinity = cfg.Routing.SessionAffinity
+ 	if ttl := strings.TrimSpace(cfg.Routing.SessionAffinityTTL); ttl != "" {
+@@ -104,6 +106,8 @@ func newRoutingSelector(state routingRuntimeState) coreauth.Selector {
+ 		selector = &coreauth.WeightedRoundRobinSelector{}
+ 	case "fill-first":
+ 		selector = &coreauth.FillFirstSelector{}
++	case "soonest-reset":
++		selector = &coreauth.SoonestResetSelector{}
+ 	default:
+ 		selector = &coreauth.RoundRobinSelector{}
+ 	}
+diff --git a/sdk/cliproxy/service_config_weight_test.go b/sdk/cliproxy/service_config_weight_test.go
+index 497a2e78242..11e337536ff 100644
+--- a/sdk/cliproxy/service_config_weight_test.go
++++ b/sdk/cliproxy/service_config_weight_test.go
+@@ -21,6 +21,30 @@ func TestWeightedRoundRobinRoutingSelector(t *testing.T) {
+ 	}
+ }
+ 
++func TestSoonestResetRoutingSelector(t *testing.T) {
++	for _, value := range []string{"soonest-reset", " Soonest-Reset ", "soonestreset", "reset-first", "resetfirst"} {
++		state := normalizedRoutingRuntimeState(&internalconfig.Config{
++			Routing: internalconfig.RoutingConfig{Strategy: value},
++		})
++		if state.strategy != "soonest-reset" {
++			t.Fatalf("strategy for %q = %q, want soonest-reset", value, state.strategy)
++		}
++		if _, ok := newRoutingSelector(state).(*coreauth.SoonestResetSelector); !ok {
++			t.Fatalf("selector type for %q = %T, want *auth.SoonestResetSelector", value, newRoutingSelector(state))
++		}
++	}
++
++	state := normalizedRoutingRuntimeState(&internalconfig.Config{
++		Routing: internalconfig.RoutingConfig{Strategy: "soonest-reset", SessionAffinity: true},
++	})
++	selector := newRoutingSelector(state)
++	affinity, ok := selector.(*coreauth.SessionAffinitySelector)
++	if !ok {
++		t.Fatalf("selector type = %T, want *auth.SessionAffinitySelector", selector)
++	}
++	affinity.Stop()
++}
++
+ func TestServiceRejectsInvalidCredentialWeightConfigCommit(t *testing.T) {
+ 	originalCfg := &internalconfig.Config{}
+ 	service := &Service{cfg: originalCfg}
