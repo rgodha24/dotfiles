@@ -7,7 +7,7 @@
       "name": "CLIProxyAPI",
       "npm": "@ai-sdk/openai",
       "options": {
-        "baseURL": "https://nixos.tail76974f.ts.net:8317/v1",
+        "baseURL": "http://127.0.0.1:8317/v1",
         "apiKey": "cliproxy",
       },
       "models": {

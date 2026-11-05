@@ -100,6 +100,7 @@
   # the proxy rewrites its config, so it gets a fresh copy with secrets on every start
   prepare = unstable.writeShellScript "cliproxyapi-prepare" ''
     set -euo pipefail
+    export PATH=${lib.makeBinPath [unstable.coreutils]}
     install -m600 ${configTemplate} ${cpaHome}/config.yaml
     for name in management-key opencode-go-key; do
       ${unstable.replace-secret}/bin/replace-secret "@$name@" ${secretsDir}/$name ${cpaHome}/config.yaml

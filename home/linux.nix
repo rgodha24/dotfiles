@@ -4,7 +4,6 @@
   unstable,
   system,
   fenixPkgs,
-  opencode,
   ...
 }: {
   home.username = "rgodha";
@@ -68,6 +67,7 @@
     CPUWeight = 10;
     Nice = 19;
     IOSchedulingClass = "idle";
+    MemoryMax = "1G";
   };
 
   services.hyprpaper.enable = true;

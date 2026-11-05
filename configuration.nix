@@ -170,6 +170,16 @@
 
   hardware.nvidia-container-toolkit.enable = true;
 
+  zramSwap = {
+    enable = true;
+    memoryPercent = 25; # ~15G of 60G, holds ~40G+ after ~3:1 compression
+  };
+  services.earlyoom = {
+    enable = true;
+    freeMemThreshold = 5; # % free RAM before earlyoom starts killing
+    freeSwapThreshold = 10;
+  };
+
   # Global dark theme
   # SSL_*: third-party Pythons (e.g. uv) link OpenSSL with defaults that expect
   # /etc/ssl/cert.pem; NixOS only exposes the bundle under cacert. Without this,

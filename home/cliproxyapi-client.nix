@@ -3,7 +3,7 @@
   unstable,
   ...
 }: let
-  hub = "https://nixos.tail76974f.ts.net:8317";
+  hub = "http://127.0.0.1:8317";
   python = unstable.python3.withPackages (p: [p.tomlkit]);
 
   pointClientsAtHub = unstable.writeScript "point-clients-at-cliproxy" ''

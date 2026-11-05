@@ -18,11 +18,6 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    opencode = {
-      # v2 includes PR #43469 (feat(nix): update cli packaging), which fixed
-      # node_modules.nix filtering the renamed-away `packages/opencode`.
-      url = "github:anomalyco/opencode/v2";
-    };
     ghfs = {
       url = "github:rgodha24/ghfs";
       inputs.nixpkgs.follows = "pkgsunstable";
@@ -65,7 +60,6 @@
     determinate,
     t3code,
     fenix,
-    opencode,
     ghfs,
     docfs,
     lumen,
@@ -113,7 +107,7 @@
     homeConfigurations.nixos = home-manager.lib.homeManagerConfiguration {
       pkgs = pkgsFor linuxSystem;
       extraSpecialArgs = {
-        inherit unstable pkgsunstable fenixPkgs opencode ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi neovim-pin t3code;
+        inherit unstable pkgsunstable fenixPkgs ghfs docfs lumen claude-code-nix codex-cli-nix herdr pi neovim-pin t3code;
         system = linuxSystem;
       };
       modules = [
@@ -128,7 +122,6 @@
         system = darwinSystem;
         unstable = unstableFor darwinSystem;
         username = "rohangodha";
-        inherit opencode;
         inherit ghfs;
         inherit docfs;
         inherit lumen;

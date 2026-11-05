@@ -2,7 +2,6 @@
   config,
   pkgs,
   unstable,
-  opencode,
   ghfs,
   docfs,
   system,
@@ -55,31 +54,6 @@
       arch = "arm64";
     }
     else throw "Unsupported system: ${system}";
-
-  # temporarily disabled: upstream node_modules hash mismatch
-  # opencodePkg = opencode.packages.${system}.opencode;
-  #
-  # opencode2Pkg = opencodePkg.overrideAttrs (old: {
-  #   pname = "opencode2";
-  #   installPhase = ''
-  #     runHook preInstall
-  #
-  #     # installed as `opencode`: v1 is gone, and herdr resumes panes with
-  #     # `opencode --session <id>`, so the v2 build has to own that name.
-  #     install -Dm755 dist/cli-*/bin/opencode2 $out/bin/opencode
-  #
-  #     wrapProgram $out/bin/opencode \
-  #       --prefix PATH : ${pkgs.lib.makeBinPath ([pkgs.ripgrep] ++ pkgs.lib.optional pkgs.stdenvNoCC.hostPlatform.isDarwin pkgs.unixtools.sysctl)} \
-  #       --set-default HERDR_AGENT opencode
-  #
-  #     ln -s opencode $out/bin/opencode2
-  #
-  #     runHook postInstall
-  #   '';
-  #   postInstall = "";
-  #   doInstallCheck = false;
-  #   meta = old.meta // {mainProgram = "opencode";};
-  # });
 
   cursorAgentPkg = pkgs.stdenv.mkDerivation {
     pname = "cursor-agent";
@@ -185,9 +159,6 @@ in {
   home.file.".pi/agent/extensions/herdr-agent-state.ts".source = ../herdr/integrations/pi.ts;
   home.file.".claude/hooks/herdr-agent-state.sh".source = ../herdr/integrations/claude.sh;
 
-  # v2 tui plugin api; registered in ~/.config/opencode/cli.json
-  home.file.".config/opencode/herdr-opencode2-session.js".source = ../herdr/integrations/opencode2-tui.js;
-
   imports = [pi.homeModules.default ./cliproxyapi-client.nix];
   programs.pi.coding-agent = {
     enable = true;
@@ -281,7 +252,7 @@ in {
       unstable.code-cursor
       # unstable.zed
 
-      # opencode2Pkg
+      unstable.opencode
       codex-cli-nix.packages.${system}.default
       claude-code-nix.packages.${system}.default
       herdr.packages.${system}.default
