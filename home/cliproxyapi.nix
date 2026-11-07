@@ -21,7 +21,12 @@
     vendorHash = "sha256-yMO0DdE0pjtFxWaQXV17enV8u0KA5fIUbE8Gui/RvWU=";
 
     # https://github.com/router-for-me/CLIProxyAPI/pull/7040
-    patches = [./patches/cliproxyapi-soonest-reset.patch];
+    patches = [
+      ./patches/cliproxyapi-soonest-reset.patch
+      # spend the last 3% (auth json weekly_reserve_percent) of a weekly window only in its last 4h
+      # or once every account is there; never the last 1%
+      ./patches/cliproxyapi-weekly-reserve.patch
+    ];
 
     subPackages = ["cmd/server"];
     ldflags = ["-s" "-w" "-X main.Version=${version}"];

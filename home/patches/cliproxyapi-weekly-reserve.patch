@@ -1,0 +1,447 @@
+From 61d27cbda4f03cc6d3ded350b638874e497e61ba Mon Sep 17 00:00:00 2001
+From: Rohan Godha <git@rohangodha.com>
+Date: Fri, 6 Nov 2026 15:57:59 -0500
+Subject: [PATCH] feat(auth): hold back each weekly window's reserve under
+ soonest-reset
+
+Under soonest-reset, a credential whose weekly window is into its reserve (3%
+by default, or the auth JSON's weekly_reserve_percent) ranks after every
+credential outside it until the window is within 4 hours of its reset, so each
+account keeps some quota until it would expire unused. A credential at least
+99% used is never picked until its reset. Bound sessions move off a reserve
+credential while another is outside its reserve. When every candidate is into
+its floor, the pick fails with a model cooldown until the soonest reset.
+---
+ sdk/cliproxy/auth/scheduler.go                |   6 +
+ sdk/cliproxy/auth/selector.go                 |  15 +-
+ sdk/cliproxy/auth/soonest_reset.go            | 142 ++++++++++++++++--
+ .../auth/soonest_reset_reserve_test.go        | 126 ++++++++++++++++
+ 4 files changed, 279 insertions(+), 10 deletions(-)
+ create mode 100644 sdk/cliproxy/auth/soonest_reset_reserve_test.go
+
+diff --git a/sdk/cliproxy/auth/scheduler.go b/sdk/cliproxy/auth/scheduler.go
+index 7b6cb0d..0a2818d 100644
+--- a/sdk/cliproxy/auth/scheduler.go
++++ b/sdk/cliproxy/auth/scheduler.go
+@@ -564,6 +564,9 @@ func (s *authScheduler) pickMixedWithStrategy(ctx context.Context, providers []s
+ 					continue
+ 				}
+ 				rank := shard.soonestResetRankLocked(entry, now)
++				if rank.tier == soonestResetTierFloor {
++					continue
++				}
+ 				if best == nil || soonestResetPrefers(rank, entry.auth.ID, bestRank, best.auth.ID) {
+ 					best = entry
+ 					bestShard = shard
+@@ -1780,6 +1783,9 @@ func (m *modelScheduler) pickSoonestResetLocked(view *readyView, predicate func(
+ 			continue
+ 		}
+ 		rank := m.soonestResetRankLocked(entry, now)
++		if rank.tier == soonestResetTierFloor {
++			continue
++		}
+ 		if best == nil || rank.less(bestRank) {
+ 			best = entry
+ 			bestRank = rank
+diff --git a/sdk/cliproxy/auth/selector.go b/sdk/cliproxy/auth/selector.go
+index aabb68d..892cc2e 100644
+--- a/sdk/cliproxy/auth/selector.go
++++ b/sdk/cliproxy/auth/selector.go
+@@ -841,10 +841,15 @@ func (s *SoonestResetSelector) Pick(ctx context.Context, provider, model string,
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	known := soonestResetFactsFromContext(ctx)
++	available, reservedUntil := soonestResetUnreserved(available, known, now)
++	if len(available) == 0 {
++		return nil, soonestResetReservedError(provider, model, reservedUntil, now)
++	}
+ 	available = preferCodexWebsocketAuths(ctx, provider, available)
+ 	s.mu.Lock()
+ 	defer s.mu.Unlock()
+-	return pickSoonestResetAuth(available, now, soonestResetFactsFromContext(ctx), &s.probes, soonestResetProbeAllowed(ctx)), nil
++	return pickSoonestResetAuth(available, now, known, &s.probes, soonestResetProbeAllowed(ctx)), nil
+ }
+ 
+ func isAuthBlockedForModel(auth *Auth, model string, now time.Time) (bool, blockReason, time.Time) {
+@@ -1187,6 +1192,14 @@ func (s *SessionAffinitySelector) Pick(ctx context.Context, provider, model stri
+ 	if err != nil {
+ 		return nil, err
+ 	}
++	if _, ok := s.fallback.(*SoonestResetSelector); ok {
++		// Bound sessions move off a credential into its weekly reserve while another is outside it.
++		var reservedUntil time.Time
++		available, reservedUntil = soonestResetUnreserved(available, soonestResetFactsFromContext(ctx), now)
++		if len(available) == 0 {
++			return nil, soonestResetReservedError(provider, model, reservedUntil, now)
++		}
++	}
+ 	fallbackAuths := highestPriorityAuths(available)
+ 
+ 	modelKey := canonicalModelKey(model)
+diff --git a/sdk/cliproxy/auth/soonest_reset.go b/sdk/cliproxy/auth/soonest_reset.go
+index 77e23b7..5844f99 100644
+--- a/sdk/cliproxy/auth/soonest_reset.go
++++ b/sdk/cliproxy/auth/soonest_reset.go
+@@ -36,6 +36,25 @@ const (
+ 	// it as a pending subscription meanwhile, so concurrent requests do not pile onto it
+ 	// before its response (for streams, the end of the stream) records the reset.
+ 	soonestResetProbeHold = 5 * time.Minute
++	// soonestResetReserveFraction of each weekly window is held back until the window is
++	// within soonestResetReserveRelease of its reset, so every account keeps some quota for
++	// its owner until it would expire unused anyway. Reserves are still spent when every
++	// candidate is into its reserve. A credential overrides it with a top-level numeric
++	// "weekly_reserve_percent" field in its auth JSON.
++	soonestResetReserveFraction = 0.03
++	soonestResetReserveRelease  = 4 * time.Hour
++	// soonestResetFloorFraction of each weekly window is never spent.
++	soonestResetFloorFraction = 0.01
++)
++
++// Weekly reserve tiers, best first.
++const (
++	soonestResetTierUsable = iota
++	// soonestResetTierReserve is into its held-back reserve: picked only when no candidate
++	// is usable.
++	soonestResetTierReserve
++	// soonestResetTierFloor is into its never-spent floor: never picked.
++	soonestResetTierFloor
+ )
+ 
+ // soonestResetFacts is what a credential's quota snapshot says, independent of the clock.
+@@ -52,6 +71,11 @@ type soonestResetFacts struct {
+ 	weeklyReset time.Time
+ 	// exhaustedUntil is when the latest used-up usage window ends; zero when none is used up.
+ 	exhaustedUntil time.Time
++	// weeklyUsed is the used fraction (0..1) of the weekly window; valid when hasWeeklyUsed.
++	weeklyUsed    float64
++	hasWeeklyUsed bool
++	// reserveFraction is the held-back share of the weekly window.
++	reserveFraction float64
+ }
+ 
+ // soonestResetRank orders credentials for the soonest-reset strategy.
+@@ -60,6 +84,8 @@ type soonestResetRank struct {
+ 	exhausted   bool
+ 	class       int
+ 	weeklyReset time.Time
++	// tier is the weekly reserve tier; floor-tier credentials are never picked.
++	tier int
+ }
+ 
+ // soonestResetFactsFor parses the credential-level quota snapshot, which holds the latest
+@@ -71,9 +97,10 @@ func soonestResetFactsFor(auth *Auth) soonestResetFacts {
+ 	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
+ 	observedAt := auth.Quota.ObservedAt
+ 	weekly, hasWeekly, windows := quotaWindowsFor(provider, auth.Quota)
+-	facts := soonestResetFacts{subscription: soonestResetSubscription(provider, auth)}
++	facts := soonestResetFacts{subscription: soonestResetSubscription(provider, auth), reserveFraction: soonestResetReserveFractionFor(auth)}
+ 	if hasWeekly {
+ 		facts.weeklyReset = weekly.reset
++		facts.weeklyUsed, facts.hasWeeklyUsed = weekly.used, weekly.hasUsed
+ 		windows = append(windows, weekly)
+ 	}
+ 	for _, window := range windows {
+@@ -102,12 +129,14 @@ func (f soonestResetFacts) carry(previous soonestResetFacts) soonestResetFacts {
+ 	if f.exhaustedUntil.After(previous.exhaustedUntil) {
+ 		previous.exhaustedUntil = f.exhaustedUntil
+ 	}
++	// The reserve is configuration, not an observation, so the newest one applies.
++	previous.reserveFraction = f.reserveFraction
+ 	return previous
+ }
+ 
+ // rank ranks the facts at now. probePending reports a recent probe pick of the credential.
+ func (f soonestResetFacts) rank(now time.Time, probePending bool) soonestResetRank {
+-	rank := soonestResetRank{exhausted: f.exhaustedUntil.After(now), class: soonestResetClassOther}
++	rank := soonestResetRank{exhausted: f.exhaustedUntil.After(now), class: soonestResetClassOther, tier: f.reserveTier(now)}
+ 	switch {
+ 	case f.weeklyReset.After(now):
+ 		rank.class = soonestResetClassKnown
+@@ -123,9 +152,96 @@ func (f soonestResetFacts) rank(now time.Time, probePending bool) soonestResetRa
+ 	return rank
+ }
+ 
+-// less reports whether r ranks strictly before other: usable before used-up credentials,
+-// then by class, then known weekly resets earliest first.
++// reserveTier reports the weekly reserve tier at now.
++func (f soonestResetFacts) reserveTier(now time.Time) int {
++	if !f.hasWeeklyUsed || !f.weeklyReset.After(now) {
++		// Without a known future reset the snapshot is stale: the window rolled over.
++		return soonestResetTierUsable
++	}
++	if f.weeklyUsed >= 1-soonestResetFloorFraction {
++		return soonestResetTierFloor
++	}
++	if f.weeklyUsed >= 1-f.reserveFraction && f.weeklyReset.Sub(now) > soonestResetReserveRelease {
++		return soonestResetTierReserve
++	}
++	return soonestResetTierUsable
++}
++
++// soonestResetReserveFractionFor reads the credential's "weekly_reserve_percent" override,
++// falling back to soonestResetReserveFraction when it is missing or outside 0..100.
++func soonestResetReserveFractionFor(auth *Auth) float64 {
++	if auth == nil {
++		return soonestResetReserveFraction
++	}
++	var percent float64
++	switch raw := auth.Metadata["weekly_reserve_percent"].(type) {
++	case float64:
++		percent = raw
++	case int:
++		percent = float64(raw)
++	case int64:
++		percent = float64(raw)
++	case string:
++		parsed, errParse := strconv.ParseFloat(strings.TrimSpace(raw), 64)
++		if errParse != nil {
++			return soonestResetReserveFraction
++		}
++		percent = parsed
++	default:
++		return soonestResetReserveFraction
++	}
++	if math.IsNaN(percent) || percent < 0 || percent > 100 {
++		return soonestResetReserveFraction
++	}
++	return percent / 100
++}
++
++// soonestResetUnreserved keeps the candidates outside their weekly reserve, else those into
++// the reserve but not the floor, ranking each by its facts in known when present, else by
++// its own snapshot. When every candidate is into its floor it returns none, and earliest is
++// the soonest weekly reset among them.
++func soonestResetUnreserved(auths []*Auth, known map[string]soonestResetFacts, now time.Time) (kept []*Auth, earliest time.Time) {
++	var usable, reserve []*Auth
++	for _, candidate := range auths {
++		if candidate == nil {
++			continue
++		}
++		facts, ok := known[candidate.ID]
++		if !ok {
++			facts = soonestResetFactsFor(candidate)
++		}
++		switch facts.reserveTier(now) {
++		case soonestResetTierUsable:
++			usable = append(usable, candidate)
++		case soonestResetTierReserve:
++			reserve = append(reserve, candidate)
++		default:
++			if earliest.IsZero() || facts.weeklyReset.Before(earliest) {
++				earliest = facts.weeklyReset
++			}
++		}
++	}
++	if len(usable) > 0 {
++		return usable, time.Time{}
++	}
++	return reserve, earliest
++}
++
++// soonestResetReservedError reports that every candidate is into its weekly floor.
++func soonestResetReservedError(provider, model string, earliest, now time.Time) error {
++	if provider == "mixed" {
++		provider = ""
++	}
++	return newModelCooldownError(model, provider, earliest.Sub(now))
++}
++
++// less reports whether r ranks strictly before other: outside the weekly reserve before
++// into it, then usable before used-up credentials, then by class, then known weekly resets
++// earliest first.
+ func (r soonestResetRank) less(other soonestResetRank) bool {
++	if r.tier != other.tier {
++		return r.tier < other.tier
++	}
+ 	if r.exhausted != other.exhausted {
+ 		return !r.exhausted
+ 	}
+@@ -260,6 +376,9 @@ func pickSoonestResetAuth(auths []*Auth, now time.Time, known map[string]soonest
+ 			facts = soonestResetFactsFor(candidate)
+ 		}
+ 		rank := facts.rank(now, pending.pending(candidate.ID, now))
++		if rank.tier == soonestResetTierFloor {
++			continue
++		}
+ 		if best == nil || soonestResetPrefers(rank, candidate.ID, bestRank, best.ID) {
+ 			best = candidate
+ 			bestRank = rank
+@@ -294,6 +413,9 @@ type quotaWindow struct {
+ 	usedUp bool
+ 	reset  time.Time
+ 	length time.Duration
++	// used is the used fraction (0..1) of the window; valid when hasUsed.
++	used    float64
++	hasUsed bool
+ }
+ 
+ // exhaustedUntil reports until when a used-up window holds: its reset, else its length (or
+@@ -345,9 +467,11 @@ func claudeQuotaWindows(signals map[string]string) (quotaWindow, bool, []quotaWi
+ 			return quotaWindow{}, false
+ 		}
+ 		return quotaWindow{
+-			usedUp: strings.EqualFold(status, "rejected") || (hasUtilization && utilization >= 1),
+-			reset:  reset,
+-			length: length,
++			usedUp:  strings.EqualFold(status, "rejected") || (hasUtilization && utilization >= 1),
++			reset:   reset,
++			length:  length,
++			used:    utilization,
++			hasUsed: hasUtilization,
+ 		}, true
+ 	}
+ 	weekly, hasWeekly := read("7d", quotaWindowWeek)
+@@ -406,7 +530,7 @@ func codexQuotaWindows(quota QuotaState) (quotaWindow, bool, []quotaWindow) {
+ 		if !hasReset && length <= 0 && (!hasUsed || used <= 0) {
+ 			return quotaWindow{}, false
+ 		}
+-		return quotaWindow{usedUp: hasUsed && used >= 100, reset: reset, length: length}, true
++		return quotaWindow{usedUp: hasUsed && used >= 100, reset: reset, length: length, used: used / 100, hasUsed: hasUsed}, true
+ 	}
+ 	primary, hasPrimary := read("Primary")
+ 	secondary, hasSecondary := read("Secondary")
+@@ -441,7 +565,7 @@ func devinQuotaWindows(signals map[string]string) (quotaWindow, bool, []quotaWin
+ 		if !hasRemaining && !hasReset {
+ 			return quotaWindow{}, false
+ 		}
+-		return quotaWindow{usedUp: hasRemaining && remaining <= 0, reset: reset, length: length}, true
++		return quotaWindow{usedUp: hasRemaining && remaining <= 0, reset: reset, length: length, used: 1 - remaining/100, hasUsed: hasRemaining}, true
+ 	}
+ 	weekly, hasWeekly := read("weekly", quotaWindowWeek)
+ 	var others []quotaWindow
+diff --git a/sdk/cliproxy/auth/soonest_reset_reserve_test.go b/sdk/cliproxy/auth/soonest_reset_reserve_test.go
+new file mode 100644
+index 0000000..8803ec3
+--- /dev/null
++++ b/sdk/cliproxy/auth/soonest_reset_reserve_test.go
+@@ -0,0 +1,126 @@
++package auth
++
++import (
++	"context"
++	"errors"
++	"fmt"
++	"net/http"
++	"testing"
++	"time"
++
++	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
++)
++
++// claudeWeeklyUsedSignals is a healthy unified snapshot with the given weekly usage and reset.
++func claudeWeeklyUsedSignals(now, reset time.Time, used float64) map[string]string {
++	signals := claudeWeeklySignals(now, reset)
++	signals["Anthropic-Ratelimit-Unified-7d-Utilization"] = fmt.Sprint(used)
++	return signals
++}
++
++func withWeeklyReserve(auth *Auth, percent float64) *Auth {
++	auth.Metadata["weekly_reserve_percent"] = percent
++	return auth
++}
++
++func TestSoonestResetReserveTier(t *testing.T) {
++	t.Parallel()
++
++	now := soonestResetTestNow
++	observed := now.Add(-time.Minute)
++	for _, testCase := range []struct {
++		name string
++		auth *Auth
++		tier int
++	}{
++		{"below reserve", claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.96)), soonestResetTierUsable},
++		{"in reserve far from reset", claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.97)), soonestResetTierReserve},
++		{"in reserve within release", claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(3*time.Hour), 0.98)), soonestResetTierUsable},
++		{"in floor within release", claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(3*time.Hour), 0.99)), soonestResetTierFloor},
++		{"in floor far from reset", claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.995)), soonestResetTierFloor},
++		{"stale after reset", claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(-time.Hour), 0.999)), soonestResetTierUsable},
++		{"override below reserve", withWeeklyReserve(claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.94)), 5), soonestResetTierUsable},
++		{"override in reserve", withWeeklyReserve(claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.95)), 5), soonestResetTierReserve},
++		{"override zero", withWeeklyReserve(claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.98)), 0), soonestResetTierUsable},
++		{"override invalid", withWeeklyReserve(claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.97)), 150), soonestResetTierReserve},
++		{"unobserved", claudeSubscription("a", time.Time{}, nil), soonestResetTierUsable},
++		{"codex in reserve", codexSubscription("a", observed, map[string]string{
++			"X-Codex-Secondary-Used-Percent":   "98",
++			"X-Codex-Secondary-Window-Minutes": "10080",
++			"X-Codex-Secondary-Reset-At":       epochSignal(now.Add(24 * time.Hour)),
++		}), soonestResetTierReserve},
++	} {
++		t.Run(testCase.name, func(t *testing.T) {
++			if got := soonestResetFactsFor(testCase.auth).reserveTier(now); got != testCase.tier {
++				t.Fatalf("reserveTier() = %d, want %d", got, testCase.tier)
++			}
++		})
++	}
++}
++
++func TestSoonestResetSelectorReserveTiers(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	observed := now.Add(-time.Minute)
++	reserve := claudeSubscription("a-reserve-soonest", observed, claudeWeeklyUsedSignals(now, now.Add(10*time.Hour), 0.98))
++	usable := claudeSubscription("b-usable-later", observed, claudeWeeklyUsedSignals(now, now.Add(96*time.Hour), 0.5))
++	floor := claudeSubscription("0-floor-soonest", observed, claudeWeeklyUsedSignals(now, now.Add(6*time.Hour), 0.995))
++	pick := func(auths ...*Auth) (*Auth, error) {
++		return (&SoonestResetSelector{}).Pick(context.Background(), "claude", "m", cliproxyexecutor.Options{}, auths)
++	}
++
++	if got, errPick := pick(floor, reserve, usable); errPick != nil || got.ID != usable.ID {
++		t.Fatalf("Pick() = %v, %v; want %s outside its reserve", got, errPick, usable.ID)
++	}
++	if got, errPick := pick(floor, reserve); errPick != nil || got.ID != reserve.ID {
++		t.Fatalf("Pick() = %v, %v; want the reserve %s spent before erroring", got, errPick, reserve.ID)
++	}
++
++	_, errPick := pick(floor)
++	var cooldown *modelCooldownError
++	if !errors.As(errPick, &cooldown) {
++		t.Fatalf("Pick() error = %v, want a model cooldown error when every auth is into its floor", errPick)
++	}
++	if cooldown.resetIn <= 5*time.Hour || cooldown.resetIn > 6*time.Hour {
++		t.Fatalf("resetIn = %v, want about 6h until the weekly reset", cooldown.resetIn)
++	}
++}
++
++func TestSessionAffinitySoonestResetMovesOffReservedBinding(t *testing.T) {
++	t.Parallel()
++
++	affinity := NewSessionAffinitySelectorWithConfig(SessionAffinityConfig{Fallback: &SoonestResetSelector{}, TTL: time.Hour})
++	t.Cleanup(affinity.Stop)
++	now := time.Now()
++	observed := now.Add(-time.Minute)
++	a := claudeSubscription("a", observed, claudeWeeklyUsedSignals(now, now.Add(24*time.Hour), 0.5))
++	b := claudeSubscription("b", observed, claudeWeeklyUsedSignals(now, now.Add(48*time.Hour), 0.5))
++	opts := func() cliproxyexecutor.Options {
++		return cliproxyexecutor.Options{Headers: http.Header{"X-Claude-Code-Session-Id": []string{"reserve-session"}}}
++	}
++
++	got, errPick := affinity.Pick(context.Background(), "claude", "", opts(), []*Auth{a, b})
++	if errPick != nil || got.ID != a.ID {
++		t.Fatalf("Pick() = %v, %v; want %s", got, errPick, a.ID)
++	}
++
++	a.Quota.Signals = claudeWeeklyUsedSignals(now, now.Add(24*time.Hour), 0.98)
++	got, errPick = affinity.Pick(context.Background(), "claude", "", opts(), []*Auth{a, b})
++	if errPick != nil || got.ID != b.ID {
++		t.Fatalf("Pick() = %v, %v; want the session moved to %s once %s is reserved", got, errPick, b.ID, a.ID)
++	}
++}
++
++func TestSoonestResetSchedulerSkipsFloorAndPrefersUsable(t *testing.T) {
++	t.Parallel()
++
++	now := time.Now()
++	ranks := []soonestResetRank{
++		soonestResetFacts{weeklyReset: now.Add(time.Hour), hasWeeklyUsed: true, weeklyUsed: 0.98, reserveFraction: soonestResetReserveFraction, subscription: true, windowed: true}.rank(now.Add(-4*time.Hour), false),
++		soonestResetFacts{weeklyReset: now.Add(90 * time.Hour), hasWeeklyUsed: true, weeklyUsed: 0.2, subscription: true, windowed: true}.rank(now, false),
++	}
++	if !ranks[1].less(ranks[0]) {
++		t.Fatalf("usable later reset should rank before a reserve with a sooner reset: %+v vs %+v", ranks[1], ranks[0])
++	}
++}
+-- 
+2.50.1
+
