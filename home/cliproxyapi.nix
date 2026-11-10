@@ -26,6 +26,11 @@
       # spend the last 3% (auth json weekly_reserve_percent) of a weekly window only in its last 4h
       # or once every account is there; never the last 1%
       ./patches/cliproxyapi-weekly-reserve.patch
+      # session bindings only hold within the best ready priority tier, so sessions that fell back
+      # to the anthropic api keys move back to a subscription as soon as one recovers
+      ./patches/cliproxyapi-tier-affinity.patch
+      # log 16 chars of session ids (was 8, i.e. "claude:" + 1 char) so claude-status can tell threads apart
+      ./patches/cliproxyapi-session-log.patch
     ];
 
     subPackages = ["cmd/server"];
@@ -46,6 +51,10 @@
 
   cpaHome = "${config.home.homeDirectory}/.cli-proxy-api";
   secretsDir = "${cpaHome}/secrets";
+
+  # secret file names under secretsDir; empty files are fine, the key is then just unusable
+  anthropicKeys = ["anthropic-gatech" "anthropic-gmail"];
+  secretNames = ["management-key" "opencode-go-key"] ++ anthropicKeys;
 
   settings = {
     config-version = 8;
@@ -74,6 +83,19 @@
     };
 
     oauth.auth-dir = cpaHome;
+
+    # worst-case fallback on paid api credits: subscription logins sit at priority 0, so these
+    # only get traffic once every subscription is out of quota or cooling down
+    api-keys.claude = [
+      {
+        name = "anthropic-api";
+        priority = -10;
+        keys = [
+          {api-key = "@anthropic-gatech@";} # gatech account
+          {api-key = "@anthropic-gmail@";} # gmail acc
+        ];
+      }
+    ];
 
     api-keys.openai-compatibility = [
       {
@@ -107,7 +129,7 @@
     set -euo pipefail
     export PATH=${lib.makeBinPath [unstable.coreutils]}
     install -m600 ${configTemplate} ${cpaHome}/config.yaml
-    for name in management-key opencode-go-key; do
+    for name in ${lib.concatStringsSep " " secretNames}; do
       ${unstable.replace-secret}/bin/replace-secret "@$name@" ${secretsDir}/$name ${cpaHome}/config.yaml
     done
 
@@ -128,9 +150,11 @@ in {
       run install -m600 /dev/null ${secretsDir}/management-key
       ${unstable.openssl}/bin/openssl rand -hex 24 > ${secretsDir}/management-key
     fi
-    if [ ! -e ${secretsDir}/opencode-go-key ]; then
-      run install -m600 /dev/null ${secretsDir}/opencode-go-key
-    fi
+    for name in opencode-go-key ${lib.concatStringsSep " " anthropicKeys}; do
+      if [ ! -e ${secretsDir}/$name ]; then
+        run install -m600 /dev/null ${secretsDir}/$name
+      fi
+    done
   '';
 
   systemd.user.services.cliproxyapi = {

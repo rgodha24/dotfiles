@@ -13,6 +13,17 @@
   pi,
   ...
 }: let
+  claudeCodePkg = claude-code-nix.packages.${system}.default;
+  # built-in general-purpose subagent, re-extracted from the claude-code binary
+  # on every claude-code bump, with a lower autoCompactWindow added
+  claudeGeneralPurposeAgent =
+    pkgs.runCommand "claude-general-purpose-agent-${claudeCodePkg.version}" {
+      nativeBuildInputs = [pkgs.python3];
+    } ''
+      bin=${claudeCodePkg}/bin/.claude-unwrapped
+      [ -e "$bin" ] || bin=${claudeCodePkg}/bin/claude
+      python3 -I ${../claude/extract-general-purpose.py} "$bin" 250000 $out
+    '';
   cryptenvPkg = unstable.rustPlatform.buildRustPackage {
     pname = "cryptenv";
     version = "0.5.1";
@@ -186,6 +197,7 @@ in {
     source = ../skills;
     recursive = true;
   };
+  home.file.".claude/agents/general-purpose.md".source = claudeGeneralPurposeAgent;
   home.file.".cursor/skills" = {
     source = ../skills;
     recursive = true;
@@ -254,7 +266,7 @@ in {
 
       unstable.opencode
       codex-cli-nix.packages.${system}.default
-      claude-code-nix.packages.${system}.default
+      claudeCodePkg
       herdr.packages.${system}.default
 
       unstable.prettierd

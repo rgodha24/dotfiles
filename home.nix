@@ -4,5 +4,6 @@
     ./home/linux.nix
     ./home/t3code.nix
     ./home/cliproxyapi.nix
+    ./home/claude-status.nix
   ];
 }

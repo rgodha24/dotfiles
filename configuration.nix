@@ -319,6 +319,21 @@
     };
   };
 
+  systemd.services.tailscale-serve-claude-status = {
+    description = "tailscale serve for the claude quota dashboard";
+    after = ["tailscaled.service"];
+    wants = ["tailscaled.service"];
+    wantedBy = ["multi-user.target"];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.tailscale}/bin/tailscale serve --bg --https=8319 http://127.0.0.1:8319";
+      ExecStop = "${pkgs.tailscale}/bin/tailscale serve --https=8319 off";
+      Restart = "on-failure";
+      RestartSec = 10;
+    };
+  };
+
   # XDG portal for screen sharing and file dialogs
   xdg.portal = {
     enable = true;

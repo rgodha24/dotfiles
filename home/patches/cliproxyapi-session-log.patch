@@ -1,0 +1,19 @@
+diff --git a/sdk/cliproxy/auth/selector.go b/sdk/cliproxy/auth/selector.go
+index 1d8c6b4..d49aa78 100644
+--- a/sdk/cliproxy/auth/selector.go
++++ b/sdk/cliproxy/auth/selector.go
+@@ -1566,12 +1566,12 @@ func selectorLogEntry(ctx context.Context) *log.Entry {
+ 	return log.NewEntry(log.StandardLogger())
+ }
+ 
+-// truncateSessionID shortens session ID for logging (first 8 chars + "...")
++// truncateSessionID shortens session ID for logging (first 16 chars + "...")
+ func truncateSessionID(id string) string {
+ 	if len(id) <= 20 {
+ 		return id
+ 	}
+-	return id[:8] + "..."
++	return id[:16] + "..."
+ }
+ 
+ // Stop releases resources held by the selector.
