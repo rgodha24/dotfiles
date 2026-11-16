@@ -19,14 +19,6 @@
 
   boot.kernelPackages = pkgs.linuxPackages;
 
-  # mount the windows fs
-  boot.supportedFilesystems = ["ntfs"];
-  fileSystems."/mnt/windows" = {
-    device = "/dev/nvme0n1p3";
-    fsType = "ntfs-3g";
-    options = ["ro" "uid=1000" "gid=1000" "umask=0022"];
-  };
-
   # nix flakes
   nix.settings.experimental-features = ["nix-command" "flakes"];
   # cachix stuff
