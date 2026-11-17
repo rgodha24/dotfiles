@@ -61,7 +61,7 @@
   };
 
   # Hyprpaper wallpaper daemon
-  # ghfs repacks big repos (posthog) and pins a core; keep it quiet.
+  # keep ghfs in the background: big first fetches (posthog) can pin a core.
   systemd.user.services.ghfs.Service = {
     CPUQuota = "100%";
     CPUWeight = 10;

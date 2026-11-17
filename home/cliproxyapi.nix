@@ -128,6 +128,14 @@
   prepare = unstable.writeShellScript "cliproxyapi-prepare" ''
     set -euo pipefail
     export PATH=${lib.makeBinPath [unstable.coreutils]}
+
+    for _ in $(seq 1 30); do
+      if ${lib.getBin unstable.glibc}/bin/getent hosts models.router-for.me >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+
     install -m600 ${configTemplate} ${cpaHome}/config.yaml
     for name in ${lib.concatStringsSep " " secretNames}; do
       ${unstable.replace-secret}/bin/replace-secret "@$name@" ${secretsDir}/$name ${cpaHome}/config.yaml
