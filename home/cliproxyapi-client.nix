@@ -3,7 +3,15 @@
   unstable,
   ...
 }: let
-  hub = "http://127.0.0.1:8317";
+  # nixos hosts the proxy; other machines (mac) reach it over the tailnet.
+  hub =
+    if unstable.stdenv.hostPlatform.isLinux
+    then "http://127.0.0.1:8317"
+    else "https://nixos.tail76974f.ts.net:8317";
+  # The checked-in configs use the local address; rewrite it to this machine's hub.
+  withHub = name: file:
+    unstable.writeText name
+    (builtins.replaceStrings ["http://127.0.0.1:8317"] [hub] (builtins.readFile file));
   python = unstable.python3.withPackages (p: [p.tomlkit]);
 
   pointClientsAtHub = unstable.writeScript "point-clients-at-cliproxy" ''
@@ -36,7 +44,8 @@
     claude.write_text(json.dumps(settings, indent=2) + "\n")
   '';
 in {
-  programs.pi.coding-agent.models = ../pi/models.json;
+  programs.pi.coding-agent.models = withHub "models.json" ../pi/models.json;
+  home.file.".config/opencode/opencode.jsonc".source = withHub "opencode.jsonc" ../opencode/config.json5;
 
   home.activation.cliproxyapiClients = lib.hm.dag.entryAfter ["writeBoundary"] ''
     run ${pointClientsAtHub}
