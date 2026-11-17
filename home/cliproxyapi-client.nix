@@ -43,11 +43,14 @@
     )
     claude.write_text(json.dumps(settings, indent=2) + "\n")
   '';
+  piModels = withHub "models.json" ../pi/models.json;
 in {
-  programs.pi.coding-agent.models = withHub "models.json" ../pi/models.json;
+  programs.pi.coding-agent.models = piModels;
   home.file.".config/opencode/opencode.jsonc".source = withHub "opencode.jsonc" ../opencode/config.json5;
 
   home.activation.cliproxyapiClients = lib.hm.dag.entryAfter ["writeBoundary"] ''
     run ${pointClientsAtHub}
+    # the pi wrapper only seeds models.json when missing, so changes would never land
+    run install -D -m600 ${piModels} "$HOME/.pi/agent/models.json"
   '';
 }
