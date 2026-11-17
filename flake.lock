@@ -645,17 +645,17 @@
     },
     "pkgsunstable": {
       "locked": {
-        "lastModified": 1790112011,
-        "narHash": "sha256-Y/tcMETB8Xe7+bR+wtvRJL0vs1pKyYHcpM0LDE/rHtQ=",
+        "lastModified": 1794537146,
+        "narHash": "sha256-Wpz/7x/YWnDIBu7yj6ixe8j6fIMsidd9Y+o1PqPF3iM=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "5c9db1a5400a7b832cfc898abe27000ad129b9be",
+        "rev": "d5cc6833999746cffdfe0598f7bc801a57b887a9",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
+        "ref": "nixos-unstable",
         "repo": "nixpkgs",
-        "rev": "5c9db1a5400a7b832cfc898abe27000ad129b9be",
         "type": "github"
       }
     },
@@ -833,11 +833,11 @@
       "locked": {
         "narHash": "sha256-m0CB/Ppw6Sykp/wsESt2MiR//y8rSuFWIgQ8RWBDBb0=",
         "type": "file",
-        "url": "https://registry.npmjs.org/@t3code%2Ft3-linux-x64/nightly"
+        "url": "https://registry.npmjs.org/@t3code/t3-linux-x64/nightly"
       },
       "original": {
         "type": "file",
-        "url": "https://registry.npmjs.org/@t3code%2Ft3-linux-x64/nightly"
+        "url": "https://registry.npmjs.org/@t3code/t3-linux-x64/nightly"
       }
     },
     "treefmt-nix": {
