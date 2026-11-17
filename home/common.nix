@@ -173,8 +173,8 @@ in {
   programs.pi.coding-agent = {
     enable = true;
     settings = {
-      defaultProvider = "opencode-go";
-      defaultModel = "glm-5.2";
+      defaultProvider = "cliproxy-go";
+      defaultModel = "glm-5.3";
       defaultThinkingLevel = "high";
       hideThinkingBlock = false;
       theme = "dark";

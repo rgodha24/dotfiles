@@ -102,9 +102,10 @@
         name = "opencode-go";
         prefix = "go";
         base-url = "https://opencode.ai/inference/go/openai/v1";
-        # go rejects requests without a per-conversation session id
+        # go rejects requests without a per-conversation session id; $CPA-SESSION-ID is the
+        # session the proxy derives for any client (falls back to a hash of the conversation)
         headers = {
-          x-opencode-session = "$session_id";
+          x-opencode-session = "$CPA-SESSION-ID";
           User-Agent = "$User-Agent";
         };
         keys = [{api-key = "@opencode-go-key@";}];

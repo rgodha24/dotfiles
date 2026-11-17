@@ -5,10 +5,133 @@
       "api": "openai-responses",
       "apiKey": "cliproxy",
       "models": [
-        { "id": "gpt-6-astra", "reasoning": true },
-        { "id": "gpt-6.1-sol", "reasoning": true },
-        { "id": "gpt-6.1-terra", "reasoning": true },
-        { "id": "gpt-6-luna", "reasoning": true }
+        {
+          "id": "gpt-6-astra",
+          "reasoning": true
+        },
+        {
+          "id": "gpt-6.1-sol",
+          "reasoning": true
+        },
+        {
+          "id": "gpt-6.1-terra",
+          "reasoning": true
+        },
+        {
+          "id": "gpt-6-luna",
+          "reasoning": true
+        }
+      ]
+    },
+    "cliproxy-go": {
+      "baseUrl": "http://127.0.0.1:8317/v1",
+      "api": "openai-completions",
+      "apiKey": "cliproxy",
+      "models": [
+        {
+          "id": "kimi-k3.1-pro",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 1048576,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens",
+            "supportsMidConvoSystemMessages": true,
+            "supportsMidConvoToolAdditions": true
+          }
+        },
+        {
+          "id": "kimi-k3",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 1048576,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens",
+            "supportsMidConvoSystemMessages": true,
+            "supportsMidConvoToolAdditions": true
+          }
+        },
+        {
+          "id": "glm-5.3",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens"
+          }
+        },
+        {
+          "id": "glm-5.3-flash",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens"
+          }
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 384000,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "thinkingFormat": "deepseek"
+          }
+        },
+        {
+          "id": "deepseek-v4.1-flash",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 384000,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens",
+            "requiresReasoningContentOnAssistantMessages": true,
+            "thinkingFormat": "deepseek"
+          }
+        },
+        {
+          "id": "mimo-v2.6-pro",
+          "reasoning": true,
+          "contextWindow": 1048576,
+          "maxTokens": 131072,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens"
+          }
+        },
+        {
+          "id": "minimax-m3.1-flash",
+          "reasoning": true,
+          "contextWindow": 1000000,
+          "maxTokens": 512000,
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsStrictMode": true,
+            "maxTokensField": "max_tokens"
+          }
+        }
       ]
     }
   }
